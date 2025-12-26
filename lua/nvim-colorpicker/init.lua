@@ -63,6 +63,8 @@ end
 ---@param opts NvimColorPickerConfig? Configuration options
 function M.setup(opts)
   get_config().setup(opts)
+  -- Setup highlight module (will enable auto-highlight if configured)
+  get_highlight().setup()
 end
 
 ---@class NvimColorPickerPickOptions
@@ -106,7 +108,9 @@ function M.pick_at_cursor()
 
   M.pick({
     color = color_info.color,
-    on_select = function(new_color)
+    on_select = function(result)
+      -- result is {fg, bg, bold, italic} - extract the appropriate color
+      local new_color = result.fg or result.bg or color_info.color
       detect.replace_color_at_cursor(new_color, color_info)
     end,
   })

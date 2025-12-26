@@ -156,15 +156,68 @@ end
 ---@type number? Autocmd group id
 local augroup = nil
 
+---Check if buffer filetype should be highlighted based on config
+---@param bufnr number Buffer number
+---@return boolean should_highlight
+local function should_highlight_buffer(bufnr)
+  local config = require('nvim-colorpicker.config').get()
+  local ft = vim.bo[bufnr].filetype
+
+  -- Check exclude list first
+  if config.highlight and config.highlight.exclude_filetypes then
+    for _, excluded in ipairs(config.highlight.exclude_filetypes) do
+      if ft == excluded then
+        return false
+      end
+    end
+  end
+
+  -- Check filetypes setting
+  if config.highlight and config.highlight.filetypes then
+    if config.highlight.filetypes == '*' then
+      return true
+    elseif type(config.highlight.filetypes) == 'table' then
+      for _, allowed in ipairs(config.highlight.filetypes) do
+        if ft == allowed then
+          return true
+        end
+      end
+      return false
+    end
+  end
+
+  return true
+end
+
 ---Enable auto-highlighting for file patterns
----@param patterns string[]? File patterns (default: common CSS/web patterns)
+---@param patterns string[]? File patterns (default: use config or common patterns)
 function M.enable_auto(patterns)
-  patterns = patterns or {
-    "*.css", "*.scss", "*.sass", "*.less",
-    "*.html", "*.htm", "*.vue", "*.svelte",
-    "*.jsx", "*.tsx", "*.js", "*.ts",
-    "*.lua", "*.vim",
-  }
+  local config = require('nvim-colorpicker.config').get()
+
+  -- Use config mode if set
+  if config.highlight and config.highlight.mode then
+    highlight_mode = config.highlight.mode
+  end
+
+  -- Build patterns from config or use defaults
+  if not patterns then
+    if config.highlight and config.highlight.filetypes == '*' then
+      patterns = { '*' }
+    elseif config.highlight and type(config.highlight.filetypes) == 'table' then
+      -- Convert filetypes to patterns
+      patterns = {}
+      for _, ft in ipairs(config.highlight.filetypes) do
+        table.insert(patterns, '*.' .. ft)
+      end
+    else
+      patterns = {
+        "*.css", "*.scss", "*.sass", "*.less",
+        "*.html", "*.htm", "*.vue", "*.svelte",
+        "*.jsx", "*.tsx", "*.js", "*.ts",
+        "*.lua", "*.vim",
+      }
+    end
+  end
 
   -- Create autocmd group
   if augroup then
@@ -177,6 +230,11 @@ function M.enable_auto(patterns)
     group = augroup,
     pattern = patterns,
     callback = function(ev)
+      -- Check if this buffer should be highlighted
+      if not should_highlight_buffer(ev.buf) then
+        return
+      end
+
       -- Debounce for TextChanged events
       if ev.event:match("TextChanged") then
         vim.defer_fn(function()
@@ -197,6 +255,22 @@ function M.enable_auto(patterns)
       active_buffers[ev.buf] = nil
     end,
   })
+end
+
+---Setup highlight module with config
+---Called automatically during plugin setup
+function M.setup()
+  local config = require('nvim-colorpicker.config').get()
+
+  -- Apply mode from config
+  if config.highlight and config.highlight.mode then
+    highlight_mode = config.highlight.mode
+  end
+
+  -- Enable auto-highlight if configured
+  if config.highlight and config.highlight.enable then
+    M.enable_auto()
+  end
 end
 
 ---Disable auto-highlighting

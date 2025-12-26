@@ -5,6 +5,13 @@
 ---@field alpha_enabled boolean Enable alpha channel editing
 ---@field recent_colors_count number Number of recent colors to track
 ---@field presets string[] Preset palettes to include
+---@field highlight NvimColorPickerHighlightConfig Inline color highlighting options
+
+---@class NvimColorPickerHighlightConfig
+---@field enable boolean Enable auto-highlighting on buffer enter
+---@field filetypes string[]|"*" Filetypes to enable highlighting ("*" for all)
+---@field exclude_filetypes string[] Filetypes to exclude from highlighting
+---@field mode "background"|"foreground"|"virtualtext" Highlight display mode
 
 ---@class NvimColorPickerKeymaps
 ---@field nav_left string|string[] Move left in grid (decrease hue)
@@ -41,6 +48,14 @@ M.defaults = {
   alpha_enabled = false,
   recent_colors_count = 10,
   presets = {},
+
+  -- Inline color highlighting
+  highlight = {
+    enable = false,  -- Set to true to enable auto-highlighting
+    filetypes = '*', -- '*' for all filetypes, or list like {'css', 'html', 'lua'}
+    exclude_filetypes = { 'lazy', 'mason', 'help', 'TelescopePrompt' },
+    mode = 'background', -- 'background', 'foreground', or 'virtualtext'
+  },
 
   keymaps = {
     -- Grid navigation (hue and lightness)
