@@ -1,0 +1,192 @@
+---@module 'nvim-colorpicker.detect'
+---@brief Cursor color detection and replacement
+---
+---This module handles detecting colors in buffer text and replacing them.
+
+local M = {}
+
+local utils = require('nvim-colorpicker.utils')
+
+-- Color patterns to detect
+local PATTERNS = {
+  -- Hex colors: #RGB, #RRGGBB, #RRGGBBAA
+  { pattern = "#%x%x%x%x%x%x%x%x", format = "hex8" },
+  { pattern = "#%x%x%x%x%x%x", format = "hex" },
+  { pattern = "#%x%x%x", format = "hex3" },
+
+  -- CSS rgb/rgba
+  { pattern = "rgba?%s*%(%s*%d+%s*,%s*%d+%s*,%s*%d+%s*[,/]?%s*[%d%.]*%s*%)", format = "rgb" },
+
+  -- CSS hsl/hsla
+  { pattern = "hsla?%s*%(%s*%d+%s*,%s*%d+%%%s*,%s*%d+%%%s*[,/]?%s*[%d%.]*%s*%)", format = "hsl" },
+
+  -- Vim highlight guifg/guibg
+  { pattern = "gui[fb]g=#%x%x%x%x%x%x", format = "vim" },
+}
+
+---@class NvimColorPickerColorInfo
+---@field color string The parsed hex color
+---@field start_col number Start column (0-indexed)
+---@field end_col number End column (0-indexed)
+---@field format string Original format type
+---@field original string Original matched string
+---@field line number Line number (1-indexed)
+
+---Get color at cursor position
+---@return NvimColorPickerColorInfo? color_info Color info or nil if no color found
+function M.get_color_at_cursor()
+  local line = vim.api.nvim_get_current_line()
+  local cursor = vim.api.nvim_win_get_cursor(0)
+  local row = cursor[1]
+  local col = cursor[2] -- 0-indexed
+
+  -- Try each pattern
+  for _, pat_info in ipairs(PATTERNS) do
+    local start_pos = 1
+    while true do
+      local match_start, match_end = line:find(pat_info.pattern, start_pos)
+      if not match_start then break end
+
+      -- Check if cursor is within this match (convert to 0-indexed)
+      local start_col = match_start - 1
+      local end_col = match_end
+
+      if col >= start_col and col < end_col then
+        local matched = line:sub(match_start, match_end)
+        local hex = M.parse_to_hex(matched, pat_info.format)
+
+        if hex then
+          return {
+            color = hex,
+            start_col = start_col,
+            end_col = end_col,
+            format = pat_info.format,
+            original = matched,
+            line = row,
+          }
+        end
+      end
+
+      start_pos = match_end + 1
+    end
+  end
+
+  return nil
+end
+
+---Get all colors in current line
+---@return NvimColorPickerColorInfo[] colors Array of color info
+function M.get_colors_in_line()
+  local line = vim.api.nvim_get_current_line()
+  local row = vim.api.nvim_win_get_cursor(0)[1]
+  local colors = {}
+
+  for _, pat_info in ipairs(PATTERNS) do
+    local start_pos = 1
+    while true do
+      local match_start, match_end = line:find(pat_info.pattern, start_pos)
+      if not match_start then break end
+
+      local matched = line:sub(match_start, match_end)
+      local hex = M.parse_to_hex(matched, pat_info.format)
+
+      if hex then
+        table.insert(colors, {
+          color = hex,
+          start_col = match_start - 1,
+          end_col = match_end,
+          format = pat_info.format,
+          original = matched,
+          line = row,
+        })
+      end
+
+      start_pos = match_end + 1
+    end
+  end
+
+  return colors
+end
+
+---Parse matched string to hex color
+---@param matched string The matched string
+---@param format string The format type
+---@return string? hex Hex color or nil
+function M.parse_to_hex(matched, format)
+  if format == "hex" then
+    return utils.normalize_hex(matched)
+  elseif format == "hex3" then
+    -- Expand #RGB to #RRGGBB
+    local short = matched:gsub("^#", "")
+    if #short == 3 then
+      local expanded = short:sub(1, 1):rep(2) .. short:sub(2, 2):rep(2) .. short:sub(3, 3):rep(2)
+      return "#" .. expanded:upper()
+    end
+  elseif format == "hex8" then
+    -- Strip alpha from #RRGGBBAA
+    return "#" .. matched:sub(2, 7):upper()
+  elseif format == "rgb" then
+    local r, g, b = matched:match("(%d+)%s*,%s*(%d+)%s*,%s*(%d+)")
+    if r and g and b then
+      return utils.rgb_to_hex(tonumber(r), tonumber(g), tonumber(b))
+    end
+  elseif format == "hsl" then
+    local h, s, l = matched:match("(%d+)%s*,%s*(%d+)%%%s*,%s*(%d+)%%")
+    if h and s and l then
+      return utils.hsl_to_hex(tonumber(h), tonumber(s), tonumber(l))
+    end
+  elseif format == "vim" then
+    local hex = matched:match("#(%x%x%x%x%x%x)")
+    if hex then
+      return "#" .. hex:upper()
+    end
+  end
+
+  return nil
+end
+
+---Format hex color to target format
+---@param hex string Hex color
+---@param format string Target format
+---@return string formatted Formatted color string
+function M.format_color(hex, format)
+  if format == "hex" or format == "hex3" or format == "hex8" then
+    return hex
+  elseif format == "rgb" then
+    local r, g, b = utils.hex_to_rgb(hex)
+    return string.format("rgb(%d, %d, %d)", math.floor(r + 0.5), math.floor(g + 0.5), math.floor(b + 0.5))
+  elseif format == "hsl" then
+    local h, s, l = utils.hex_to_hsl(hex)
+    return string.format("hsl(%d, %d%%, %d%%)", math.floor(h + 0.5), math.floor(s + 0.5), math.floor(l + 0.5))
+  elseif format == "vim" then
+    -- Preserve guifg= or guibg= prefix
+    return hex
+  end
+
+  return hex
+end
+
+---Replace color at cursor with new color
+---@param new_color string New hex color
+---@param color_info NvimColorPickerColorInfo Original color info from get_color_at_cursor
+function M.replace_color_at_cursor(new_color, color_info)
+  if not color_info then return end
+
+  -- Format the new color to match original format
+  local formatted
+  if color_info.format == "vim" then
+    -- Preserve guifg= or guibg= prefix
+    local prefix = color_info.original:match("^(gui[fb]g=)")
+    formatted = (prefix or "") .. new_color
+  else
+    formatted = M.format_color(new_color, color_info.format)
+  end
+
+  -- Get the line and replace
+  local line = vim.api.nvim_get_current_line()
+  local new_line = line:sub(1, color_info.start_col) .. formatted .. line:sub(color_info.end_col + 1)
+
+  vim.api.nvim_set_current_line(new_line)
+end
+
+return M
