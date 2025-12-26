@@ -7,12 +7,10 @@ local M = {}
 
 local utils = require('nvim-colorpicker.utils')
 
--- Color patterns to detect
+-- Color patterns to detect (order matters - more specific patterns first)
 local PATTERNS = {
-  -- Hex colors: #RGB, #RRGGBB, #RRGGBBAA
-  { pattern = "#%x%x%x%x%x%x%x%x", format = "hex8" },
-  { pattern = "#%x%x%x%x%x%x", format = "hex" },
-  { pattern = "#%x%x%x", format = "hex3" },
+  -- Vim highlight guifg/guibg (must come before hex to avoid double-matching)
+  { pattern = "gui[fb]g=#%x%x%x%x%x%x", format = "vim" },
 
   -- CSS rgb/rgba
   { pattern = "rgba?%s*%(%s*%d+%s*,%s*%d+%s*,%s*%d+%s*[,/]?%s*[%d%.]*%s*%)", format = "rgb" },
@@ -20,8 +18,10 @@ local PATTERNS = {
   -- CSS hsl/hsla
   { pattern = "hsla?%s*%(%s*%d+%s*,%s*%d+%%%s*,%s*%d+%%%s*[,/]?%s*[%d%.]*%s*%)", format = "hsl" },
 
-  -- Vim highlight guifg/guibg
-  { pattern = "gui[fb]g=#%x%x%x%x%x%x", format = "vim" },
+  -- Hex colors: #RGB, #RRGGBB, #RRGGBBAA (least specific, check last)
+  { pattern = "#%x%x%x%x%x%x%x%x", format = "hex8" },
+  { pattern = "#%x%x%x%x%x%x", format = "hex" },
+  { pattern = "#%x%x%x", format = "hex3" },
 }
 
 ---@class NvimColorPickerColorInfo
