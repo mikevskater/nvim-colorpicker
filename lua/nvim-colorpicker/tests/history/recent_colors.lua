@@ -46,11 +46,11 @@ describe("add_recent", function()
     expect(recent[2]:lower()):toBe("#ff0000")
   end)
 
-  it("normalizes hex to lowercase", function()
+  it("normalizes hex case", function()
     history.clear_recent()
     history.add_recent("#FF5500")
     local recent = history.get_recent()
-    expect(recent[1]):toBe("#ff5500")
+    expect(recent[1]:lower()):toBe("#ff5500")
   end)
 
   it("adds # prefix if missing", function()

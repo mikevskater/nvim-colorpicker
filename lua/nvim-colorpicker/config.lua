@@ -1,6 +1,7 @@
 ---@class NvimColorPickerConfig
 ---@field keymaps NvimColorPickerKeymaps Keymap configuration
 ---@field default_format "hex"|"rgb"|"hsl"|"hsv" Default color format
+---@field hex_case "upper"|"lower" Hex color case for normalize_hex output
 ---@field alpha_enabled boolean Enable alpha channel editing
 ---@field recent_colors_count number Number of recent colors to track
 ---@field presets string[] Preset palettes to include
@@ -36,6 +37,7 @@ local M = {}
 ---@type NvimColorPickerConfig
 M.defaults = {
   default_format = 'hex',
+  hex_case = 'upper',  -- "upper" or "lower" for normalized hex output
   alpha_enabled = false,
   recent_colors_count = 10,
   presets = {},

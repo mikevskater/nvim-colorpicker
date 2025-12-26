@@ -239,17 +239,33 @@ end
 function M.is_valid_hex(hex)
   if type(hex) ~= "string" then return false end
   hex = hex:gsub("^#", "")
-  return #hex == 6 and hex:match("^%x+$") ~= nil
+  -- Support 3-digit (#RGB), 6-digit (#RRGGBB), and 8-digit (#RRGGBBAA)
+  local len = #hex
+  return (len == 3 or len == 6 or len == 8) and hex:match("^%x+$") ~= nil
 end
 
----Normalize hex color (ensure # prefix and uppercase)
+---Normalize hex color (ensure # prefix, expand 3-digit to 6-digit, apply case setting)
 ---@param hex string
 ---@return string
 function M.normalize_hex(hex)
   if not M.is_valid_hex(hex) then
     return "#808080" -- fallback gray
   end
-  hex = hex:gsub("^#", ""):upper()
+  hex = hex:gsub("^#", "")
+  -- Expand 3-digit to 6-digit
+  if #hex == 3 then
+    hex = hex:sub(1, 1):rep(2) .. hex:sub(2, 2):rep(2) .. hex:sub(3, 3):rep(2)
+  elseif #hex == 8 then
+    -- Strip alpha for normalization (keep first 6 chars)
+    hex = hex:sub(1, 6)
+  end
+  -- Apply case from config (default: upper)
+  local config = require('nvim-colorpicker.config').get()
+  if config.hex_case == 'lower' then
+    hex = hex:lower()
+  else
+    hex = hex:upper()
+  end
   return "#" .. hex
 end
 
@@ -628,39 +644,58 @@ function M.convert_format(color, target_format)
 end
 
 ---Parse any color string format to hex
----@param color string Color string (hex, rgb(), hsl(), hsv())
+---@param color string Color string (hex, rgb(), rgba(), hsl(), hsla(), hsv())
 ---@return string? hex Hex color or nil if invalid
 function M.parse_color_string(color)
   if not color or type(color) ~= "string" then return nil end
 
   color = color:match("^%s*(.-)%s*$") -- trim
+  if color == "" then return nil end
 
-  -- Hex format: #RGB, #RRGGBB
+  -- Hex format: #RGB, #RRGGBB, #RRGGBBAA
   if color:match("^#?%x+$") then
     local hex = color:gsub("^#", "")
     if #hex == 3 then
       -- Expand shorthand #RGB to #RRGGBB
       hex = hex:sub(1, 1):rep(2) .. hex:sub(2, 2):rep(2) .. hex:sub(3, 3):rep(2)
-    end
-    if #hex == 6 then
       return "#" .. hex:upper()
+    elseif #hex == 6 then
+      return "#" .. hex:upper()
+    elseif #hex == 8 then
+      -- 8-digit hex with alpha - return the color part
+      return "#" .. hex:sub(1, 6):upper()
     end
   end
 
-  -- RGB format: rgb(r, g, b)
-  local r, g, b = color:match("rgb%s*%(%s*(%d+)%s*,%s*(%d+)%s*,%s*(%d+)%s*%)")
+  -- RGB format: rgb(r, g, b) - integer values
+  local r, g, b = color:match("rgba?%s*%(%s*(%d+)%s*,%s*(%d+)%s*,%s*(%d+)")
   if r and g and b then
     return M.rgb_to_hex(tonumber(r), tonumber(g), tonumber(b))
   end
 
-  -- HSL format: hsl(h, s%, l%)
-  local h, s, l = color:match("hsl%s*%(%s*(%d+)%s*,%s*(%d+)%%%s*,%s*(%d+)%%%s*%)")
+  -- RGB format with percentage values: rgb(r%, g%, b%)
+  local rp, gp, bp = color:match("rgba?%s*%(%s*([%d%.]+)%%%s*,%s*([%d%.]+)%%%s*,%s*([%d%.]+)%%")
+  if rp and gp and bp then
+    local rv = math.floor(tonumber(rp) * 255 / 100 + 0.5)
+    local gv = math.floor(tonumber(gp) * 255 / 100 + 0.5)
+    local bv = math.floor(tonumber(bp) * 255 / 100 + 0.5)
+    return M.rgb_to_hex(rv, gv, bv)
+  end
+
+  -- HSL format: hsl(h, s%, l%) or hsla(h, s%, l%, a)
+  local h, s, l = color:match("hsla?%s*%(%s*(%d+)%s*,%s*(%d+)%%%s*,%s*(%d+)%%")
   if h and s and l then
     return M.hsl_to_hex(tonumber(h), tonumber(s), tonumber(l))
   end
 
-  -- HSV format: hsv(h, s%, v%)
-  local hh, ss, v = color:match("hsv%s*%(%s*(%d+)%s*,%s*(%d+)%%%s*,%s*(%d+)%%%s*%)")
+  -- HSV format: hsv(h, s%, v%) - with percent signs
+  local hh, ss, v = color:match("hsv%s*%(%s*(%d+)%s*,%s*(%d+)%%%s*,%s*(%d+)%%")
+  if hh and ss and v then
+    return M.hsv_to_hex(tonumber(hh), tonumber(ss), tonumber(v))
+  end
+
+  -- HSV format: hsv(h, s, v) - without percent signs (values 0-100)
+  hh, ss, v = color:match("hsv%s*%(%s*(%d+)%s*,%s*(%d+)%s*,%s*(%d+)")
   if hh and ss and v then
     return M.hsv_to_hex(tonumber(hh), tonumber(ss), tonumber(v))
   end

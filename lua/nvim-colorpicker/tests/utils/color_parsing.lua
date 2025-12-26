@@ -265,14 +265,20 @@ describe("normalize_hex", function()
     expect(#hex):toBe(7)  -- # + 6 chars
   end)
 
-  it("lowercases hex", function()
-    local hex = utils.normalize_hex("#FF5500")
-    expect(hex):toBe("#ff5500")
+  it("applies consistent case (default upper)", function()
+    local hex = utils.normalize_hex("#ff5500")
+    -- Default config is uppercase
+    expect(hex):toBe("#FF5500")
   end)
 
-  it("preserves valid 6-digit hex", function()
+  it("normalizes mixed case input", function()
+    local hex = utils.normalize_hex("#FfAaBb")
+    expect(hex:lower()):toBe("#ffaabb")
+  end)
+
+  it("preserves valid 6-digit hex structure", function()
     local hex = utils.normalize_hex("#ff5500")
-    expect(hex):toBe("#ff5500")
+    expect(hex:lower()):toBe("#ff5500")
   end)
 end)
 
