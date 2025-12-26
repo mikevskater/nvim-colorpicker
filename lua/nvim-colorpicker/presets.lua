@@ -154,16 +154,23 @@ M.web = {
     { name = "lavenderblush", hex = "#FFF0F5" },
     { name = "mistyrose", hex = "#FFE4E1" },
 
-    -- Grays
+    -- Grays (with British spellings)
     { name = "gainsboro", hex = "#DCDCDC" },
     { name = "lightgray", hex = "#D3D3D3" },
+    { name = "lightgrey", hex = "#D3D3D3" },
     { name = "silver", hex = "#C0C0C0" },
     { name = "darkgray", hex = "#A9A9A9" },
+    { name = "darkgrey", hex = "#A9A9A9" },
     { name = "gray", hex = "#808080" },
+    { name = "grey", hex = "#808080" },
     { name = "dimgray", hex = "#696969" },
+    { name = "dimgrey", hex = "#696969" },
     { name = "lightslategray", hex = "#778899" },
+    { name = "lightslategrey", hex = "#778899" },
     { name = "slategray", hex = "#708090" },
+    { name = "slategrey", hex = "#708090" },
     { name = "darkslategray", hex = "#2F4F4F" },
+    { name = "darkslategrey", hex = "#2F4F4F" },
     { name = "black", hex = "#000000" },
   },
 }
@@ -704,10 +711,25 @@ function M.get_preset_names()
   return names
 end
 
----Get a preset by name
+---Get a preset by name (returns dict of color_name -> hex)
 ---@param name string Preset name (e.g., "web", "material", "tailwind")
----@return table? preset The preset table with name and colors
+---@return table<string, string>? preset Dict of color names to hex values
 function M.get_preset(name)
+  local preset = M[name]
+  if not preset or not preset.colors then return nil end
+
+  -- Convert array format to dict format for easier lookup
+  local result = {}
+  for _, color in ipairs(preset.colors) do
+    result[color.name] = color.hex
+  end
+  return result
+end
+
+---Get raw preset data (with name and colors array)
+---@param name string Preset name
+---@return table? preset The raw preset table
+function M.get_preset_raw(name)
   return M[name]
 end
 
@@ -735,7 +757,7 @@ function M.search(query)
   return matches
 end
 
----Get color by exact name from a preset
+---Get color by name from a preset (case-insensitive)
 ---@param preset_name string Preset name
 ---@param color_name string Color name
 ---@return string? hex The hex color or nil
@@ -743,8 +765,9 @@ function M.get_color(preset_name, color_name)
   local preset = M[preset_name]
   if not preset or not preset.colors then return nil end
 
+  local lower_name = color_name:lower()
   for _, color in ipairs(preset.colors) do
-    if color.name == color_name then
+    if color.name:lower() == lower_name then
       return color.hex
     end
   end

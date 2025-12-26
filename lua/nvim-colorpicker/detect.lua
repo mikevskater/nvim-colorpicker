@@ -74,11 +74,13 @@ function M.get_color_at_cursor()
   return nil
 end
 
----Get all colors in current line
+---Get all colors in a line
+---@param line string? Line content (defaults to current line)
+---@param row number? Line number (defaults to cursor row)
 ---@return NvimColorPickerColorInfo[] colors Array of color info
-function M.get_colors_in_line()
-  local line = vim.api.nvim_get_current_line()
-  local row = vim.api.nvim_win_get_cursor(0)[1]
+function M.get_colors_in_line(line, row)
+  line = line or vim.api.nvim_get_current_line()
+  row = row or vim.api.nvim_win_get_cursor(0)[1]
   local colors = {}
 
   for _, pat_info in ipairs(PATTERNS) do
@@ -126,12 +128,14 @@ function M.parse_to_hex(matched, format)
     -- Strip alpha from #RRGGBBAA
     return "#" .. matched:sub(2, 7):upper()
   elseif format == "rgb" then
-    local r, g, b = matched:match("(%d+)%s*,%s*(%d+)%s*,%s*(%d+)")
+    -- Match both rgb() and rgba() - extract first 3 numbers
+    local r, g, b = matched:match("rgba?%s*%(%s*(%d+)%s*[,/]?%s*(%d+)%s*[,/]?%s*(%d+)")
     if r and g and b then
       return utils.rgb_to_hex(tonumber(r), tonumber(g), tonumber(b))
     end
   elseif format == "hsl" then
-    local h, s, l = matched:match("(%d+)%s*,%s*(%d+)%%%s*,%s*(%d+)%%")
+    -- Match both hsl() and hsla() - extract h, s%, l%
+    local h, s, l = matched:match("hsla?%s*%(%s*(%d+)%s*[,/]?%s*(%d+)%%%s*[,/]?%s*(%d+)%%")
     if h and s and l then
       return utils.hsl_to_hex(tonumber(h), tonumber(s), tonumber(l))
     end
