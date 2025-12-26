@@ -25,7 +25,7 @@ describe("add_recent", function()
     history.add_recent("#ff5500")
     local recent = history.get_recent()
     expect(#recent):toBe(1)
-    expect(recent[1]:lower()):toBe("#ff5500")
+    expect(recent[1]):toBe("#FF5500")
   end)
 
   it("adds multiple colors", function()
@@ -42,15 +42,15 @@ describe("add_recent", function()
     history.add_recent("#ff0000")
     history.add_recent("#00ff00")
     local recent = history.get_recent()
-    expect(recent[1]:lower()):toBe("#00ff00")
-    expect(recent[2]:lower()):toBe("#ff0000")
+    expect(recent[1]):toBe("#00FF00")
+    expect(recent[2]):toBe("#FF0000")
   end)
 
   it("normalizes hex case", function()
     history.clear_recent()
     history.add_recent("#FF5500")
     local recent = history.get_recent()
-    expect(recent[1]:lower()):toBe("#ff5500")
+    expect(recent[1]):toBe("#FF5500")
   end)
 
   it("adds # prefix if missing", function()
@@ -73,7 +73,7 @@ describe("duplicate handling", function()
     history.add_recent("#ff0000")  -- Add red again
     local recent = history.get_recent()
     expect(#recent):toBe(2)  -- Should not duplicate
-    expect(recent[1]:lower()):toBe("#ff0000")  -- Red should be first now
+    expect(recent[1]):toBe("#FF0000")  -- Red should be first now
   end)
 
   it("handles case-insensitive duplicates", function()
@@ -123,7 +123,7 @@ describe("max recent limit", function()
     -- #111111 should be gone
     local has111 = false
     for _, c in ipairs(recent) do
-      if c:lower() == "#111111" then has111 = true end
+      if c == "#111111" then has111 = true end
     end
     expect(has111):toBeFalsy()
     -- Reset max
@@ -229,7 +229,7 @@ describe("clear_recent", function()
     history.add_recent("#00ff00")
     local recent = history.get_recent()
     expect(#recent):toBe(1)
-    expect(recent[1]:lower()):toBe("#00ff00")
+    expect(recent[1]):toBe("#00FF00")
   end)
 end)
 

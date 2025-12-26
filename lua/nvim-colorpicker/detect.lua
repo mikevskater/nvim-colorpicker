@@ -82,6 +82,7 @@ function M.get_colors_in_line(line, row)
   line = line or vim.api.nvim_get_current_line()
   row = row or vim.api.nvim_win_get_cursor(0)[1]
   local colors = {}
+  local covered = {} -- Track which positions are already covered
 
   for _, pat_info in ipairs(PATTERNS) do
     local start_pos = 1
@@ -89,18 +90,31 @@ function M.get_colors_in_line(line, row)
       local match_start, match_end = line:find(pat_info.pattern, start_pos)
       if not match_start then break end
 
-      local matched = line:sub(match_start, match_end)
-      local hex = M.parse_to_hex(matched, pat_info.format)
+      -- Check if this position is already covered by a previous match
+      local already_covered = false
+      for _, range in ipairs(covered) do
+        -- Skip if this match overlaps with an existing one
+        if match_start >= range[1] and match_start <= range[2] then
+          already_covered = true
+          break
+        end
+      end
 
-      if hex then
-        table.insert(colors, {
-          color = hex,
-          start_col = match_start - 1,
-          end_col = match_end,
-          format = pat_info.format,
-          original = matched,
-          line = row,
-        })
+      if not already_covered then
+        local matched = line:sub(match_start, match_end)
+        local hex = M.parse_to_hex(matched, pat_info.format)
+
+        if hex then
+          table.insert(colors, {
+            color = hex,
+            start_col = match_start - 1,
+            end_col = match_end,
+            format = pat_info.format,
+            original = matched,
+            line = row,
+          })
+          table.insert(covered, { match_start, match_end })
+        end
       end
 
       start_pos = match_end + 1

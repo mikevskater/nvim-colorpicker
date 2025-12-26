@@ -19,7 +19,7 @@ describe("yank - basic", function()
     history.yank("#ff5500")
 
     local clipboard = vim.fn.getreg('+')
-    expect(clipboard):toContain("ff5500")
+    expect(clipboard):toContain("FF5500")
   end)
 
   it("copies to both + and \" registers", function()
@@ -30,8 +30,8 @@ describe("yank - basic", function()
 
     local plus = vim.fn.getreg('+')
     local quote = vim.fn.getreg('"')
-    expect(plus):toContain("00ff00")
-    expect(quote):toContain("00ff00")
+    expect(plus):toContain("00FF00")
+    expect(quote):toContain("00FF00")
   end)
 
   it("normalizes hex before copying", function()
@@ -40,8 +40,7 @@ describe("yank - basic", function()
     history.yank("#FF5500")
 
     local clipboard = vim.fn.getreg('+')
-    -- Should contain the color (case may vary)
-    expect(clipboard:lower()):toContain("ff5500")
+    expect(clipboard):toContain("FF5500")
   end)
 end)
 
@@ -117,28 +116,28 @@ describe("paste - hex formats", function()
     vim.fn.setreg('+', '#ff5500')
 
     local hex = history.paste()
-    expect(hex:lower()):toBe("#ff5500")
+    expect(hex):toBe("#FF5500")
   end)
 
   it("parses hex without #", function()
     vim.fn.setreg('+', 'ff5500')
 
     local hex = history.paste()
-    expect(hex:lower()):toBe("#ff5500")
+    expect(hex):toBe("#FF5500")
   end)
 
   it("parses 3-digit hex", function()
     vim.fn.setreg('+', '#f50')
 
     local hex = history.paste()
-    expect(hex:lower()):toBe("#ff5500")
+    expect(hex):toBe("#FF5500")
   end)
 
   it("handles uppercase hex", function()
     vim.fn.setreg('+', '#FF5500')
 
     local hex = history.paste()
-    expect(hex):toBeTruthy()
+    expect(hex):toBe("#FF5500")
   end)
 end)
 
@@ -147,21 +146,21 @@ describe("paste - rgb formats", function()
     vim.fn.setreg('+', 'rgb(255, 85, 0)')
 
     local hex = history.paste()
-    expect(hex:lower()):toBe("#ff5500")
+    expect(hex):toBe("#FF5500")
   end)
 
   it("parses rgb without spaces", function()
     vim.fn.setreg('+', 'rgb(255,85,0)')
 
     local hex = history.paste()
-    expect(hex:lower()):toBe("#ff5500")
+    expect(hex):toBe("#FF5500")
   end)
 
   it("parses rgba()", function()
     vim.fn.setreg('+', 'rgba(255, 85, 0, 0.5)')
 
     local hex = history.paste()
-    expect(hex:lower()):toBe("#ff5500")
+    expect(hex):toBe("#FF5500")
   end)
 end)
 
@@ -170,14 +169,14 @@ describe("paste - hsl formats", function()
     vim.fn.setreg('+', 'hsl(0, 100%, 50%)')
 
     local hex = history.paste()
-    expect(hex:lower()):toBe("#ff0000")
+    expect(hex):toBe("#FF0000")
   end)
 
   it("parses hsla()", function()
     vim.fn.setreg('+', 'hsla(120, 100%, 50%, 0.5)')
 
     local hex = history.paste()
-    expect(hex:lower()):toBe("#00ff00")
+    expect(hex):toBe("#00FF00")
   end)
 end)
 
@@ -251,7 +250,7 @@ describe("paste - fallback to \" register", function()
     vim.fn.setreg('"', '#00ff00')
 
     local hex = history.paste()
-    expect(hex:lower()):toBe("#00ff00")
+    expect(hex):toBe("#00FF00")
   end)
 
   it("prefers + register over \"", function()
@@ -259,7 +258,7 @@ describe("paste - fallback to \" register", function()
     vim.fn.setreg('"', '#00ff00')
 
     local hex = history.paste()
-    expect(hex:lower()):toBe("#ff0000")
+    expect(hex):toBe("#FF0000")
   end)
 end)
 
@@ -269,32 +268,32 @@ end)
 
 describe("yank/paste round-trip", function()
   it("round-trips hex correctly", function()
-    local original = "#ff5500"
+    local original = "#FF5500"
     vim.fn.setreg('+', '')
 
     history.yank(original, "hex")
     local result = history.paste()
 
-    expect(result:lower()):toBe(original:lower())
+    expect(result):toBe("#FF5500")
   end)
 
   it("round-trips rgb correctly", function()
-    local original = "#ff5500"
+    local original = "#FF5500"
     vim.fn.setreg('+', '')
 
     history.yank(original, "rgb")
     local result = history.paste()
 
-    expect(result:lower()):toBe(original:lower())
+    expect(result):toBe("#FF5500")
   end)
 
   it("round-trips hsl correctly", function()
-    local original = "#ff0000"  -- Pure red for accurate round-trip
+    local original = "#FF0000"  -- Pure red for accurate round-trip
     vim.fn.setreg('+', '')
 
     history.yank(original, "hsl")
     local result = history.paste()
 
-    expect(result:lower()):toBe(original:lower())
+    expect(result):toBe("#FF0000")
   end)
 end)
