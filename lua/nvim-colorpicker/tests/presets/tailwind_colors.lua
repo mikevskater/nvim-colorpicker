@@ -1,6 +1,6 @@
 ---@brief Tests for Tailwind CSS color presets
 
-local framework = require('tests.framework')
+local framework = require('nvim-colorpicker.tests.framework')
 local describe, it, expect = framework.describe, framework.it, framework.expect
 
 local presets = require('nvim-colorpicker.presets')

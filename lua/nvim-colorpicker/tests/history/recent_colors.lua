@@ -1,6 +1,6 @@
 ---@brief Tests for recent colors tracking
 
-local framework = require('tests.framework')
+local framework = require('nvim-colorpicker.tests.framework')
 local describe, it, expect = framework.describe, framework.it, framework.expect
 
 local history = require('nvim-colorpicker.history')

@@ -1,6 +1,6 @@
 ---@brief Tests for color parsing and format conversion
 
-local framework = require('tests.framework')
+local framework = require('nvim-colorpicker.tests.framework')
 local describe, it, expect = framework.describe, framework.it, framework.expect
 
 local utils = require('nvim-colorpicker.utils')

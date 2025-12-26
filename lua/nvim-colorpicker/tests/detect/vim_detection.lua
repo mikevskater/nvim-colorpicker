@@ -1,6 +1,6 @@
 ---@brief Tests for vim highlight color detection (guifg/guibg)
 
-local framework = require('tests.framework')
+local framework = require('nvim-colorpicker.tests.framework')
 local describe, it, expect = framework.describe, framework.it, framework.expect
 
 local detect = require('nvim-colorpicker.detect')

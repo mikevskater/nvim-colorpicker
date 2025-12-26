@@ -3,7 +3,7 @@
 
 local M = {}
 
-local framework = require('tests.framework')
+local framework = require('nvim-colorpicker.tests.framework')
 
 -- ============================================================================
 -- Types
@@ -306,7 +306,7 @@ end
 ---Show results in UI (placeholder for viewer module)
 ---@param results table Test results
 function M.show_ui(results)
-  local ok, viewer = pcall(require, 'tests.viewer')
+  local ok, viewer = pcall(require, 'nvim-colorpicker.tests.viewer')
   if ok then
     viewer.show(results)
   else

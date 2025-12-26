@@ -266,7 +266,7 @@ end
 
 ---Re-run tests and update UI
 local function rerun_tests()
-  local runner = require('tests.runner')
+  local runner = require('nvim-colorpicker.tests.runner')
   results = runner.run({ save = true, print = false, ui = false })
   selected_category = 1
   selected_file = 0
@@ -296,7 +296,7 @@ end
 function M.show(data)
   -- Get or run tests
   if not data then
-    local runner = require('tests.runner')
+    local runner = require('nvim-colorpicker.tests.runner')
     data = runner.run({ save = true, print = false, ui = false })
   end
 

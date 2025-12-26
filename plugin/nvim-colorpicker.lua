@@ -120,18 +120,18 @@ vim.api.nvim_create_user_command('ColorPickerTest', function(opts)
   local arg = opts.args:lower()
   if arg == 'ui' or arg == '' then
     -- Run tests and show UI
-    local viewer = require('tests.viewer')
+    local viewer = require('nvim-colorpicker.tests.viewer')
     viewer.show()
   elseif arg == 'run' then
     -- Run tests and print to console
-    local runner = require('tests.runner')
+    local runner = require('nvim-colorpicker.tests.runner')
     runner.run({ save = true, print = true, ui = false })
   elseif arg == 'last' then
     -- Show last results in UI
-    local runner = require('tests.runner')
+    local runner = require('nvim-colorpicker.tests.runner')
     local results = runner.load_results()
     if results then
-      local viewer = require('tests.viewer')
+      local viewer = require('nvim-colorpicker.tests.viewer')
       viewer.show(results)
     else
       vim.notify('No previous test results found', vim.log.levels.WARN)
