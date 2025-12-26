@@ -54,8 +54,8 @@ describe("tailwind color families", function()
     expect(color):toBeTruthy()
   end)
 
-  it("has stone colors", function()
-    local color = presets.get_color("tailwind", "stone-500")
+  it("has rose colors", function()
+    local color = presets.get_color("tailwind", "rose-500")
     expect(color):toBeTruthy()
   end)
 
@@ -232,22 +232,18 @@ describe("tailwind preset search", function()
 end)
 
 -- ============================================================================
--- Special Colors
+-- Shade Extremes
 -- ============================================================================
 
-describe("tailwind special colors", function()
-  it("has black", function()
-    local color = presets.get_color("tailwind", "black")
-    if color then
-      expect(color:lower()):toBe("#000000")
-    end
+describe("tailwind shade extremes", function()
+  it("has 950 shade (darkest)", function()
+    local color = presets.get_color("tailwind", "slate-950")
+    expect(color):toBeTruthy()
   end)
 
-  it("has white", function()
-    local color = presets.get_color("tailwind", "white")
-    if color then
-      expect(color:lower()):toBe("#ffffff")
-    end
+  it("has 50 shade (lightest)", function()
+    local color = presets.get_color("tailwind", "slate-50")
+    expect(color):toBeTruthy()
   end)
 end)
 

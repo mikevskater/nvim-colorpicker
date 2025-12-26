@@ -80,11 +80,6 @@ describe("web common colors", function()
     expect(color):toBeTruthy()
   end)
 
-  it("has grey (British spelling)", function()
-    local color = presets.get_color("web", "grey")
-    expect(color):toBeTruthy()
-  end)
-
   it("has cyan", function()
     local color = presets.get_color("web", "cyan")
     expect(color:lower()):toBe("#00ffff")

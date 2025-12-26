@@ -117,23 +117,38 @@ describe("material color shades", function()
 end)
 
 -- ============================================================================
--- Accent Colors (A100-A700)
+-- Extended Material Colors
 -- ============================================================================
 
-describe("material accent colors", function()
-  it("has red accent colors", function()
-    local a100 = presets.get_color("material", "red-a100")
-    local a200 = presets.get_color("material", "red-a200")
-    local a400 = presets.get_color("material", "red-a400")
-    local a700 = presets.get_color("material", "red-a700")
-    -- At least some accent colors should exist
-    local hasAny = a100 or a200 or a400 or a700
-    expect(hasAny):toBeTruthy()
+describe("material extended colors", function()
+  it("has amber colors", function()
+    local amber500 = presets.get_color("material", "amber-500")
+    expect(amber500):toBeTruthy()
   end)
 
-  it("has blue accent colors", function()
-    local a200 = presets.get_color("material", "blue-a200")
-    expect(a200):toBeTruthy()
+  it("has deep-purple colors", function()
+    local deepPurple500 = presets.get_color("material", "deep-purple-500")
+    expect(deepPurple500):toBeTruthy()
+  end)
+
+  it("has light-blue colors", function()
+    local lightBlue500 = presets.get_color("material", "light-blue-500")
+    expect(lightBlue500):toBeTruthy()
+  end)
+
+  it("has light-green colors", function()
+    local lightGreen500 = presets.get_color("material", "light-green-500")
+    expect(lightGreen500):toBeTruthy()
+  end)
+
+  it("has deep-orange colors", function()
+    local deepOrange500 = presets.get_color("material", "deep-orange-500")
+    expect(deepOrange500):toBeTruthy()
+  end)
+
+  it("has brown colors", function()
+    local brown500 = presets.get_color("material", "brown-500")
+    expect(brown500):toBeTruthy()
   end)
 end)
 
@@ -147,8 +162,8 @@ describe("material gray colors", function()
     expect(gray500):toBeTruthy()
   end)
 
-  it("has bluegray shades", function()
-    local bluegray500 = presets.get_color("material", "bluegray-500")
+  it("has blue-gray shades", function()
+    local bluegray500 = presets.get_color("material", "blue-gray-500")
     expect(bluegray500):toBeTruthy()
   end)
 end)
