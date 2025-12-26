@@ -67,8 +67,8 @@ function M.highlight_buffer(bufnr)
   for line_idx, line in ipairs(lines) do
     local line_num = line_idx - 1 -- 0-indexed
 
-    -- Find all colors in line using detect patterns
-    local colors = detect.get_colors_in_line_text(line, line_idx)
+    -- Find all colors in line using detect module (has proper deduplication)
+    local colors = detect.get_colors_in_line(line, line_idx)
 
     for _, color_info in ipairs(colors) do
       local hl_name = get_or_create_hl(color_info.color)
@@ -279,57 +279,6 @@ function M.disable_auto()
     vim.api.nvim_del_augroup_by_id(augroup)
     augroup = nil
   end
-end
-
--- ============================================================================
--- Helper for detect module
--- ============================================================================
-
--- Add this helper to detect module would need access to
--- For now, we'll add a local implementation
-
----Get all colors in a line of text
----@param line string Line text
----@param line_num number Line number (1-indexed)
----@return table[] colors
-function detect.get_colors_in_line_text(line, line_num)
-  local colors = {}
-
-  -- Color patterns (same as detect.lua)
-  local patterns = {
-    { pattern = "#%x%x%x%x%x%x%x%x", format = "hex8" },
-    { pattern = "#%x%x%x%x%x%x", format = "hex" },
-    { pattern = "#%x%x%x", format = "hex3" },
-    { pattern = "rgba?%s*%(%s*%d+%s*,%s*%d+%s*,%s*%d+%s*[,/]?%s*[%d%.]*%s*%)", format = "rgb" },
-    { pattern = "hsla?%s*%(%s*%d+%s*,%s*%d+%%%s*,%s*%d+%%%s*[,/]?%s*[%d%.]*%s*%)", format = "hsl" },
-    { pattern = "gui[fb]g=#%x%x%x%x%x%x", format = "vim" },
-  }
-
-  for _, pat_info in ipairs(patterns) do
-    local start_pos = 1
-    while true do
-      local match_start, match_end = line:find(pat_info.pattern, start_pos)
-      if not match_start then break end
-
-      local matched = line:sub(match_start, match_end)
-      local hex = detect.parse_to_hex(matched, pat_info.format)
-
-      if hex then
-        table.insert(colors, {
-          color = hex,
-          start_col = match_start - 1, -- 0-indexed
-          end_col = match_end,
-          format = pat_info.format,
-          original = matched,
-          line = line_num,
-        })
-      end
-
-      start_pos = match_end + 1
-    end
-  end
-
-  return colors
 end
 
 return M

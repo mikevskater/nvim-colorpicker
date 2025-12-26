@@ -4,11 +4,23 @@
 local M = {}
 
 -- ============================================================================
--- Dependencies
+-- Dependencies (lazy-loaded to avoid test failures in headless mode)
 -- ============================================================================
 
-local nf = require("nvim-float")
-local ContentBuilder = require("nvim-float.content_builder")
+local nf, ContentBuilder
+
+local function ensure_deps()
+  if not nf then
+    local ok, float = pcall(require, "nvim-float")
+    if not ok then
+      vim.notify("nvim-colorpicker test viewer requires nvim-float", vim.log.levels.ERROR)
+      return false
+    end
+    nf = float
+    ContentBuilder = require("nvim-float.content_builder")
+  end
+  return true
+end
 
 -- ============================================================================
 -- State
@@ -314,6 +326,11 @@ end
 ---Show test results in multipanel UI
 ---@param data table? Test results (will run tests if not provided)
 function M.show(data)
+  -- Ensure dependencies are available
+  if not ensure_deps() then
+    return
+  end
+
   -- Get or run tests
   if not data then
     local runner = require('nvim-colorpicker.tests.runner')
