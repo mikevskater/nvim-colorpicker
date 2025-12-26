@@ -133,7 +133,7 @@ local function build_detail_panel(data)
         for _, suite in ipairs(file.suites) do
           for _, test in ipairs(suite.tests) do
             if not test.passed then
-              cb:error(string.format("      X %s > %s", suite.name, test.name))
+              cb:styled(string.format("      X %s > %s", suite.name, test.name), "error")
             end
           end
         end
@@ -165,9 +165,9 @@ local function build_detail_panel(data)
 
       for _, test in ipairs(suite.tests) do
         if test.passed then
-          cb:success(string.format("    + %s", test.name))
+          cb:styled(string.format("    + %s", test.name), "success")
         else
-          cb:error(string.format("    X %s", test.name))
+          cb:styled(string.format("    X %s", test.name), "error")
           if test.error then
             -- Wrap error message
             local err_lines = vim.split(test.error, "\n")
