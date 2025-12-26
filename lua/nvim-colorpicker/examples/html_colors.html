@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HTML Colors Test - nvim-colorpicker</title>
+
+  <!--
+  ============================================================================
+  HTML Colors Test File - nvim-colorpicker
+  ============================================================================
+
+  TEST INSTRUCTIONS:
+  1. Run :ColorHighlight to see inline color previews
+  2. Position cursor on any color value
+  3. Run :ColorPickerAtCursor to open picker and replace
+  4. Test both inline styles and embedded CSS
+
+  ============================================================================
+  -->
+
+  <style>
+    /* ========================================================================
+       Section 1: Embedded CSS - Basic Colors
+       ======================================================================== */
+
+    :root {
+      --primary: #3498DB;
+      --secondary: #2ECC71;
+      --accent: #E74C3C;
+      --background: #FFFFFF;
+      --text: #333333;
+    }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background-color: #F5F5F5;
+      color: #1A1A1A;
+      line-height: 1.6;
+    }
+
+    /* ========================================================================
+       Section 2: Component Styles
+       ======================================================================== */
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #FFFFFF;
+      padding: 20px;
+      border-bottom: 4px solid #5A67D8;
+    }
+
+    .nav-link {
+      color: #E2E8F0;
+      border-bottom: 2px solid transparent;
+    }
+
+    .nav-link:hover {
+      color: #FFFFFF;
+      border-bottom-color: #FBD38D;
+    }
+
+    /* ========================================================================
+       Section 3: Buttons with Various States
+       ======================================================================== */
+
+    .btn-primary {
+      background-color: #3B82F6;
+      border-color: #2563EB;
+      color: #FFFFFF;
+    }
+
+    .btn-primary:hover {
+      background-color: #2563EB;
+      border-color: #1D4ED8;
+    }
+
+    .btn-success {
+      background-color: #10B981;
+      border-color: #059669;
+      color: #FFFFFF;
+    }
+
+    .btn-danger {
+      background-color: #EF4444;
+      border-color: #DC2626;
+      color: #FFFFFF;
+    }
+
+    .btn-warning {
+      background-color: #F59E0B;
+      border-color: #D97706;
+      color: #1F2937;
+    }
+
+    /* ========================================================================
+       Section 4: Cards and Shadows
+       ======================================================================== */
+
+    .card {
+      background-color: #FFFFFF;
+      border: 1px solid #E5E7EB;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .card-header {
+      background-color: #F9FAFB;
+      border-bottom: 1px solid #E5E7EB;
+      color: #374151;
+    }
+
+    .card-accent {
+      border-left: 4px solid #6366F1;
+    }
+
+    /* ========================================================================
+       Section 5: Alerts and Notifications
+       ======================================================================== */
+
+    .alert-success {
+      background-color: #D1FAE5;
+      border-color: #A7F3D0;
+      color: #065F46;
+    }
+
+    .alert-warning {
+      background-color: #FEF3C7;
+      border-color: #FDE68A;
+      color: #92400E;
+    }
+
+    .alert-error {
+      background-color: #FEE2E2;
+      border-color: #FECACA;
+      color: #991B1B;
+    }
+
+    .alert-info {
+      background-color: #DBEAFE;
+      border-color: #BFDBFE;
+      color: #1E40AF;
+    }
+
+    /* ========================================================================
+       Section 6: Form Elements
+       ======================================================================== */
+
+    .input {
+      border: 1px solid #D1D5DB;
+      background-color: #FFFFFF;
+      color: #1F2937;
+    }
+
+    .input:focus {
+      border-color: #3B82F6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+    }
+
+    .input::placeholder {
+      color: #9CA3AF;
+    }
+
+    /* ========================================================================
+       Section 7: RGB and HSL Examples
+       ======================================================================== */
+
+    .rgb-example {
+      background-color: rgb(99, 102, 241);
+      border-color: rgb(79, 70, 229);
+      color: rgb(255, 255, 255);
+    }
+
+    .rgba-example {
+      background-color: rgba(139, 92, 246, 0.8);
+      box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
+    }
+
+    .hsl-example {
+      background-color: hsl(262, 83%, 58%);
+      color: hsl(0, 0%, 100%);
+    }
+
+    .hsla-example {
+      background-color: hsla(262, 83%, 58%, 0.9);
+      border: 2px solid hsla(262, 83%, 40%, 1);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ======================================================================
+       Section 8: Inline Styles - Basic
+       ====================================================================== -->
+
+  <div style="background-color: #1F2937; color: #F9FAFB; padding: 20px;">
+    <h1 style="color: #60A5FA; margin: 0;">Inline Style Header</h1>
+    <p style="color: #9CA3AF;">Subtitle with muted color</p>
+  </div>
+
+  <!-- ======================================================================
+       Section 9: Inline Styles - Multiple Properties
+       ====================================================================== -->
+
+  <div style="background: #FFFFFF; border: 2px solid #E5E7EB; border-left: 4px solid #3B82F6; padding: 16px; margin: 20px 0;">
+    <h2 style="color: #1F2937;">Card Title</h2>
+    <p style="color: #6B7280;">Card description with gray text</p>
+    <button style="background-color: #3B82F6; color: #FFFFFF; border: none; padding: 8px 16px;">
+      Action Button
+    </button>
+  </div>
+
+  <!-- ======================================================================
+       Section 10: Inline RGB/RGBA
+       ====================================================================== -->
+
+  <div style="background-color: rgba(0, 0, 0, 0.8); padding: 20px; margin: 20px 0;">
+    <p style="color: rgb(255, 255, 255);">White text on dark background</p>
+    <p style="color: rgba(255, 255, 255, 0.7);">Semi-transparent white text</p>
+    <a style="color: rgb(96, 165, 250);" href="#">Link color</a>
+  </div>
+
+  <!-- ======================================================================
+       Section 11: Inline HSL
+       ====================================================================== -->
+
+  <div style="background-color: hsl(220, 13%, 18%); color: hsl(0, 0%, 90%); padding: 20px; margin: 20px 0;">
+    <h3 style="color: hsl(210, 100%, 70%);">HSL Colors Example</h3>
+    <p style="color: hsla(0, 0%, 100%, 0.8);">Text with HSLA color</p>
+  </div>
+
+  <!-- ======================================================================
+       Section 12: SVG Colors
+       ====================================================================== -->
+
+  <svg width="200" height="100" style="margin: 20px 0;">
+    <rect x="0" y="0" width="50" height="100" fill="#FF5500"/>
+    <rect x="50" y="0" width="50" height="100" fill="#3498DB"/>
+    <rect x="100" y="0" width="50" height="100" fill="#2ECC71"/>
+    <rect x="150" y="0" width="50" height="100" fill="#9B59B6"/>
+    <circle cx="25" cy="50" r="20" fill="rgba(255, 255, 255, 0.5)" stroke="#FFFFFF" stroke-width="2"/>
+  </svg>
+
+  <!-- ======================================================================
+       Section 13: Data Attributes with Colors
+       ====================================================================== -->
+
+  <div
+    data-color="#FF5500"
+    data-bg-color="#1E1E1E"
+    data-border-color="#3C3C3C"
+    style="padding: 10px; background: #F0F0F0;">
+    Element with color data attributes
+  </div>
+
+  <!-- ======================================================================
+       Section 14: Table with Alternating Colors
+       ====================================================================== -->
+
+  <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+    <thead>
+      <tr style="background-color: #374151; color: #FFFFFF;">
+        <th style="padding: 12px; border: 1px solid #4B5563;">Header 1</th>
+        <th style="padding: 12px; border: 1px solid #4B5563;">Header 2</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="background-color: #FFFFFF;">
+        <td style="padding: 12px; border: 1px solid #E5E7EB; color: #1F2937;">Row 1</td>
+        <td style="padding: 12px; border: 1px solid #E5E7EB; color: #1F2937;">Data</td>
+      </tr>
+      <tr style="background-color: #F9FAFB;">
+        <td style="padding: 12px; border: 1px solid #E5E7EB; color: #1F2937;">Row 2</td>
+        <td style="padding: 12px; border: 1px solid #E5E7EB; color: #1F2937;">Data</td>
+      </tr>
+      <tr style="background-color: #FFFFFF;">
+        <td style="padding: 12px; border: 1px solid #E5E7EB; color: #1F2937;">Row 3</td>
+        <td style="padding: 12px; border: 1px solid #E5E7EB; color: #1F2937;">Data</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ======================================================================
+       Section 15: Gradient Backgrounds
+       ====================================================================== -->
+
+  <div style="background: linear-gradient(to right, #FF512F, #DD2476); color: #FFFFFF; padding: 40px; text-align: center; margin: 20px 0;">
+    Linear Gradient
+  </div>
+
+  <div style="background: radial-gradient(circle, #667eea, #764ba2); color: #FFFFFF; padding: 40px; text-align: center; margin: 20px 0;">
+    Radial Gradient
+  </div>
+
+</body>
+</html>

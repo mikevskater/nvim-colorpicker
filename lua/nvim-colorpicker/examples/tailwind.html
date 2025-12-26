@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tailwind Colors Test - nvim-colorpicker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!--
+  ============================================================================
+  Tailwind CSS Colors Test File - nvim-colorpicker
+  ============================================================================
+
+  TEST INSTRUCTIONS:
+  1. Test preset search: :lua require('nvim-colorpicker').search_presets('blue')
+  2. Test tailwind colors: :lua print(vim.inspect(require('nvim-colorpicker.presets').get_preset('tailwind')))
+  3. Position cursor on any hex color and use :ColorPickerAtCursor
+  4. The Tailwind classes here reference the preset colors
+
+  PRESET TESTING:
+  - Search for "slate" - should find slate-50 through slate-950
+  - Search for "blue-500" - should find the exact shade
+  - Search for "emerald" - should find all emerald shades
+
+  ============================================================================
+  -->
+
+  <style>
+    /* Custom colors matching Tailwind palette for comparison */
+    :root {
+      /* Slate */
+      --slate-50: #f8fafc;
+      --slate-100: #f1f5f9;
+      --slate-200: #e2e8f0;
+      --slate-300: #cbd5e1;
+      --slate-400: #94a3b8;
+      --slate-500: #64748b;
+      --slate-600: #475569;
+      --slate-700: #334155;
+      --slate-800: #1e293b;
+      --slate-900: #0f172a;
+      --slate-950: #020617;
+
+      /* Blue */
+      --blue-50: #eff6ff;
+      --blue-100: #dbeafe;
+      --blue-200: #bfdbfe;
+      --blue-300: #93c5fd;
+      --blue-400: #60a5fa;
+      --blue-500: #3b82f6;
+      --blue-600: #2563eb;
+      --blue-700: #1d4ed8;
+      --blue-800: #1e40af;
+      --blue-900: #1e3a8a;
+      --blue-950: #172554;
+
+      /* Emerald */
+      --emerald-50: #ecfdf5;
+      --emerald-100: #d1fae5;
+      --emerald-200: #a7f3d0;
+      --emerald-300: #6ee7b7;
+      --emerald-400: #34d399;
+      --emerald-500: #10b981;
+      --emerald-600: #059669;
+      --emerald-700: #047857;
+      --emerald-800: #065f46;
+      --emerald-900: #064e3b;
+      --emerald-950: #022c22;
+
+      /* Rose */
+      --rose-50: #fff1f2;
+      --rose-100: #ffe4e6;
+      --rose-200: #fecdd3;
+      --rose-300: #fda4af;
+      --rose-400: #fb7185;
+      --rose-500: #f43f5e;
+      --rose-600: #e11d48;
+      --rose-700: #be123c;
+      --rose-800: #9f1239;
+      --rose-900: #881337;
+      --rose-950: #4c0519;
+
+      /* Amber */
+      --amber-50: #fffbeb;
+      --amber-100: #fef3c7;
+      --amber-200: #fde68a;
+      --amber-300: #fcd34d;
+      --amber-400: #fbbf24;
+      --amber-500: #f59e0b;
+      --amber-600: #d97706;
+      --amber-700: #b45309;
+      --amber-800: #92400e;
+      --amber-900: #78350f;
+      --amber-950: #451a03;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-900 p-8">
+
+  <!-- ======================================================================
+       Section 1: Color Palette Display
+       Reference: These hex values should match tailwind preset
+       ====================================================================== -->
+
+  <div class="mb-8">
+    <h1 class="text-3xl font-bold text-slate-800 mb-4">Tailwind Color Palette</h1>
+
+    <!-- Slate Scale -->
+    <div class="mb-6">
+      <h2 class="text-lg font-semibold text-slate-700 mb-2">Slate</h2>
+      <div class="flex gap-1">
+        <div class="w-16 h-16 bg-slate-50 border" title="#f8fafc"></div>
+        <div class="w-16 h-16 bg-slate-100" title="#f1f5f9"></div>
+        <div class="w-16 h-16 bg-slate-200" title="#e2e8f0"></div>
+        <div class="w-16 h-16 bg-slate-300" title="#cbd5e1"></div>
+        <div class="w-16 h-16 bg-slate-400" title="#94a3b8"></div>
+        <div class="w-16 h-16 bg-slate-500" title="#64748b"></div>
+        <div class="w-16 h-16 bg-slate-600" title="#475569"></div>
+        <div class="w-16 h-16 bg-slate-700" title="#334155"></div>
+        <div class="w-16 h-16 bg-slate-800" title="#1e293b"></div>
+        <div class="w-16 h-16 bg-slate-900" title="#0f172a"></div>
+        <div class="w-16 h-16 bg-slate-950" title="#020617"></div>
+      </div>
+    </div>
+
+    <!-- Blue Scale -->
+    <div class="mb-6">
+      <h2 class="text-lg font-semibold text-slate-700 mb-2">Blue</h2>
+      <div class="flex gap-1">
+        <div class="w-16 h-16 bg-blue-50 border" title="#eff6ff"></div>
+        <div class="w-16 h-16 bg-blue-100" title="#dbeafe"></div>
+        <div class="w-16 h-16 bg-blue-200" title="#bfdbfe"></div>
+        <div class="w-16 h-16 bg-blue-300" title="#93c5fd"></div>
+        <div class="w-16 h-16 bg-blue-400" title="#60a5fa"></div>
+        <div class="w-16 h-16 bg-blue-500" title="#3b82f6"></div>
+        <div class="w-16 h-16 bg-blue-600" title="#2563eb"></div>
+        <div class="w-16 h-16 bg-blue-700" title="#1d4ed8"></div>
+        <div class="w-16 h-16 bg-blue-800" title="#1e40af"></div>
+        <div class="w-16 h-16 bg-blue-900" title="#1e3a8a"></div>
+        <div class="w-16 h-16 bg-blue-950" title="#172554"></div>
+      </div>
+    </div>
+
+    <!-- Emerald Scale -->
+    <div class="mb-6">
+      <h2 class="text-lg font-semibold text-slate-700 mb-2">Emerald</h2>
+      <div class="flex gap-1">
+        <div class="w-16 h-16 bg-emerald-50 border" title="#ecfdf5"></div>
+        <div class="w-16 h-16 bg-emerald-100" title="#d1fae5"></div>
+        <div class="w-16 h-16 bg-emerald-200" title="#a7f3d0"></div>
+        <div class="w-16 h-16 bg-emerald-300" title="#6ee7b7"></div>
+        <div class="w-16 h-16 bg-emerald-400" title="#34d399"></div>
+        <div class="w-16 h-16 bg-emerald-500" title="#10b981"></div>
+        <div class="w-16 h-16 bg-emerald-600" title="#059669"></div>
+        <div class="w-16 h-16 bg-emerald-700" title="#047857"></div>
+        <div class="w-16 h-16 bg-emerald-800" title="#065f46"></div>
+        <div class="w-16 h-16 bg-emerald-900" title="#064e3b"></div>
+        <div class="w-16 h-16 bg-emerald-950" title="#022c22"></div>
+      </div>
+    </div>
+
+    <!-- Rose Scale -->
+    <div class="mb-6">
+      <h2 class="text-lg font-semibold text-slate-700 mb-2">Rose</h2>
+      <div class="flex gap-1">
+        <div class="w-16 h-16 bg-rose-50 border" title="#fff1f2"></div>
+        <div class="w-16 h-16 bg-rose-100" title="#ffe4e6"></div>
+        <div class="w-16 h-16 bg-rose-200" title="#fecdd3"></div>
+        <div class="w-16 h-16 bg-rose-300" title="#fda4af"></div>
+        <div class="w-16 h-16 bg-rose-400" title="#fb7185"></div>
+        <div class="w-16 h-16 bg-rose-500" title="#f43f5e"></div>
+        <div class="w-16 h-16 bg-rose-600" title="#e11d48"></div>
+        <div class="w-16 h-16 bg-rose-700" title="#be123c"></div>
+        <div class="w-16 h-16 bg-rose-800" title="#9f1239"></div>
+        <div class="w-16 h-16 bg-rose-900" title="#881337"></div>
+        <div class="w-16 h-16 bg-rose-950" title="#4c0519"></div>
+      </div>
+    </div>
+
+    <!-- Amber Scale -->
+    <div class="mb-6">
+      <h2 class="text-lg font-semibold text-slate-700 mb-2">Amber</h2>
+      <div class="flex gap-1">
+        <div class="w-16 h-16 bg-amber-50 border" title="#fffbeb"></div>
+        <div class="w-16 h-16 bg-amber-100" title="#fef3c7"></div>
+        <div class="w-16 h-16 bg-amber-200" title="#fde68a"></div>
+        <div class="w-16 h-16 bg-amber-300" title="#fcd34d"></div>
+        <div class="w-16 h-16 bg-amber-400" title="#fbbf24"></div>
+        <div class="w-16 h-16 bg-amber-500" title="#f59e0b"></div>
+        <div class="w-16 h-16 bg-amber-600" title="#d97706"></div>
+        <div class="w-16 h-16 bg-amber-700" title="#b45309"></div>
+        <div class="w-16 h-16 bg-amber-800" title="#92400e"></div>
+        <div class="w-16 h-16 bg-amber-900" title="#78350f"></div>
+        <div class="w-16 h-16 bg-amber-950" title="#451a03"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       Section 2: UI Components with Tailwind Classes
+       ====================================================================== -->
+
+  <div class="mb-8">
+    <h2 class="text-2xl font-bold text-slate-800 mb-4">UI Components</h2>
+
+    <!-- Buttons -->
+    <div class="flex gap-4 mb-6">
+      <button class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+        Primary
+      </button>
+      <button class="px-4 py-2 bg-emerald-500 text-white rounded hover:bg-emerald-600">
+        Success
+      </button>
+      <button class="px-4 py-2 bg-rose-500 text-white rounded hover:bg-rose-600">
+        Danger
+      </button>
+      <button class="px-4 py-2 bg-amber-500 text-slate-900 rounded hover:bg-amber-600">
+        Warning
+      </button>
+      <button class="px-4 py-2 bg-slate-200 text-slate-700 rounded hover:bg-slate-300">
+        Secondary
+      </button>
+    </div>
+
+    <!-- Cards -->
+    <div class="grid grid-cols-3 gap-4 mb-6">
+      <div class="p-4 bg-white border border-slate-200 rounded-lg shadow-sm">
+        <h3 class="text-lg font-semibold text-slate-800">Default Card</h3>
+        <p class="text-slate-600">With slate borders</p>
+      </div>
+      <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <h3 class="text-lg font-semibold text-blue-800">Info Card</h3>
+        <p class="text-blue-600">With blue theme</p>
+      </div>
+      <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+        <h3 class="text-lg font-semibold text-emerald-800">Success Card</h3>
+        <p class="text-emerald-600">With emerald theme</p>
+      </div>
+    </div>
+
+    <!-- Alerts -->
+    <div class="space-y-4">
+      <div class="p-4 bg-blue-100 border-l-4 border-blue-500 text-blue-700">
+        Info: This is an informational alert
+      </div>
+      <div class="p-4 bg-emerald-100 border-l-4 border-emerald-500 text-emerald-700">
+        Success: Operation completed successfully
+      </div>
+      <div class="p-4 bg-amber-100 border-l-4 border-amber-500 text-amber-700">
+        Warning: Please review before continuing
+      </div>
+      <div class="p-4 bg-rose-100 border-l-4 border-rose-500 text-rose-700">
+        Error: Something went wrong
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       Section 3: Inline Hex Values for Direct Testing
+       ====================================================================== -->
+
+  <div class="mb-8">
+    <h2 class="text-2xl font-bold text-slate-800 mb-4">Direct Hex Values</h2>
+    <p class="text-slate-600 mb-4">Position cursor on these hex values and test :ColorPickerAtCursor</p>
+
+    <div class="bg-white p-4 rounded-lg border border-slate-200 font-mono text-sm">
+      <p>Blue-500: <span style="color: #3b82f6">#3b82f6</span></p>
+      <p>Emerald-500: <span style="color: #10b981">#10b981</span></p>
+      <p>Rose-500: <span style="color: #f43f5e">#f43f5e</span></p>
+      <p>Amber-500: <span style="color: #f59e0b">#f59e0b</span></p>
+      <p>Slate-500: <span style="color: #64748b">#64748b</span></p>
+      <p>Violet-500: <span style="color: #8b5cf6">#8b5cf6</span></p>
+      <p>Cyan-500: <span style="color: #06b6d4">#06b6d4</span></p>
+      <p>Pink-500: <span style="color: #ec4899">#ec4899</span></p>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       Section 4: Gradient Examples
+       ====================================================================== -->
+
+  <div class="mb-8">
+    <h2 class="text-2xl font-bold text-slate-800 mb-4">Gradients</h2>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div class="h-24 bg-gradient-to-r from-blue-500 to-emerald-500 rounded-lg flex items-center justify-center text-white font-semibold">
+        Blue to Emerald
+      </div>
+      <div class="h-24 bg-gradient-to-r from-rose-500 to-amber-500 rounded-lg flex items-center justify-center text-white font-semibold">
+        Rose to Amber
+      </div>
+      <div class="h-24 bg-gradient-to-r from-violet-500 via-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white font-semibold">
+        Violet via Purple to Pink
+      </div>
+      <div class="h-24 bg-gradient-to-br from-slate-900 to-slate-600 rounded-lg flex items-center justify-center text-white font-semibold">
+        Dark Slate Gradient
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

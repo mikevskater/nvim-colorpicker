@@ -1,0 +1,171 @@
+/* ============================================================================
+ * CSS Colors Test File - nvim-colorpicker
+ * ============================================================================
+ *
+ * TEST INSTRUCTIONS:
+ * 1. Run :ColorHighlight to see inline color previews
+ * 2. Position cursor on any color value
+ * 3. Run :ColorPickerAtCursor to open picker and replace
+ * 4. Run :ColorYank to copy color to clipboard
+ * 5. Run :ColorConvert rgb to convert format
+ *
+ * ============================================================================ */
+
+/* ----------------------------------------------------------------------------
+ * Section 1: Hex Colors (6-digit)
+ * Test: Detection, picking, replacement
+ * ---------------------------------------------------------------------------- */
+
+.hex-colors {
+  color: #FF5500;
+  background-color: #3498db;
+  border-color: #2ecc71;
+  outline-color: #e74c3c;
+  box-shadow: 0 0 10px #9b59b6;
+}
+
+/* Multiple colors on one line */
+.multi-hex { color: #ff0000; background: #00ff00; border: 1px solid #0000ff; }
+
+/* ----------------------------------------------------------------------------
+ * Section 2: Hex Colors (3-digit shorthand)
+ * Test: Short hex expansion
+ * ---------------------------------------------------------------------------- */
+
+.short-hex {
+  color: #f00;
+  background: #0f0;
+  border-color: #00f;
+  outline: #fc0;
+}
+
+/* ----------------------------------------------------------------------------
+ * Section 3: Hex Colors (8-digit with alpha)
+ * Test: Alpha channel handling
+ * ---------------------------------------------------------------------------- */
+
+.hex-alpha {
+  color: #FF550080;
+  background: #3498dbcc;
+  border-color: #2ecc71aa;
+}
+
+/* ----------------------------------------------------------------------------
+ * Section 4: RGB Colors
+ * Test: rgb() format detection and conversion
+ * ---------------------------------------------------------------------------- */
+
+.rgb-colors {
+  color: rgb(255, 85, 0);
+  background-color: rgb(52, 152, 219);
+  border-color: rgb(46, 204, 113);
+  outline-color: rgb(231, 76, 60);
+}
+
+/* RGB with different spacing */
+.rgb-spacing {
+  color: rgb(255,85,0);
+  background: rgb( 100 , 150 , 200 );
+}
+
+/* ----------------------------------------------------------------------------
+ * Section 5: RGBA Colors
+ * Test: rgba() format with alpha
+ * ---------------------------------------------------------------------------- */
+
+.rgba-colors {
+  color: rgba(255, 85, 0, 0.5);
+  background-color: rgba(52, 152, 219, 0.8);
+  border-color: rgba(46, 204, 113, 1);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+}
+
+/* ----------------------------------------------------------------------------
+ * Section 6: HSL Colors
+ * Test: hsl() format detection and conversion
+ * ---------------------------------------------------------------------------- */
+
+.hsl-colors {
+  color: hsl(20, 100%, 50%);
+  background-color: hsl(204, 70%, 53%);
+  border-color: hsl(145, 63%, 49%);
+  outline-color: hsl(6, 78%, 57%);
+}
+
+/* HSL edge cases */
+.hsl-edge {
+  color: hsl(0, 0%, 0%);       /* Black */
+  background: hsl(0, 0%, 100%); /* White */
+  border: hsl(0, 100%, 50%);    /* Pure red */
+}
+
+/* ----------------------------------------------------------------------------
+ * Section 7: HSLA Colors
+ * Test: hsla() format with alpha
+ * ---------------------------------------------------------------------------- */
+
+.hsla-colors {
+  color: hsla(20, 100%, 50%, 0.5);
+  background-color: hsla(204, 70%, 53%, 0.8);
+  border-color: hsla(145, 63%, 49%, 1);
+}
+
+/* ----------------------------------------------------------------------------
+ * Section 8: CSS Variables with Colors
+ * Test: Colors inside var definitions
+ * ---------------------------------------------------------------------------- */
+
+:root {
+  --primary-color: #3498db;
+  --secondary-color: #2ecc71;
+  --accent-color: #e74c3c;
+  --text-color: rgb(51, 51, 51);
+  --shadow-color: rgba(0, 0, 0, 0.2);
+}
+
+/* ----------------------------------------------------------------------------
+ * Section 9: Gradients
+ * Test: Multiple colors in gradient syntax
+ * ---------------------------------------------------------------------------- */
+
+.gradients {
+  background: linear-gradient(to right, #ff0000, #00ff00, #0000ff);
+  background: radial-gradient(circle, #ffffff, #000000);
+  background: linear-gradient(45deg, rgba(255, 0, 0, 0.5), rgba(0, 0, 255, 0.5));
+}
+
+/* ----------------------------------------------------------------------------
+ * Section 10: Real-world Examples
+ * Test: Practical usage scenarios
+ * ---------------------------------------------------------------------------- */
+
+.button-primary {
+  background-color: #007bff;
+  border-color: #007bff;
+  color: #ffffff;
+}
+
+.button-primary:hover {
+  background-color: #0056b3;
+  border-color: #004085;
+}
+
+.alert-success {
+  color: #155724;
+  background-color: #d4edda;
+  border-color: #c3e6cb;
+}
+
+.alert-danger {
+  color: #721c24;
+  background-color: #f8d7da;
+  border-color: #f5c6cb;
+}
+
+/* Dark theme colors */
+.dark-theme {
+  --bg-primary: #1a1a2e;
+  --bg-secondary: #16213e;
+  --accent: #e94560;
+  --text: #eaeaea;
+}
