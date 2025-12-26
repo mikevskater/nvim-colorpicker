@@ -28,7 +28,7 @@
 local M = {}
 
 ---Plugin version
-M.version = '0.6.0'
+M.version = '0.7.0'
 
 -- Lazy-load modules
 local function get_config()
@@ -45,6 +45,18 @@ end
 
 local function get_detect()
   return require('nvim-colorpicker.detect')
+end
+
+local function get_presets()
+  return require('nvim-colorpicker.presets')
+end
+
+local function get_history()
+  return require('nvim-colorpicker.history')
+end
+
+local function get_highlight()
+  return require('nvim-colorpicker.highlight')
 end
 
 ---Setup nvim-colorpicker with options
@@ -128,6 +140,111 @@ end
 ---@return table Color utilities (hex_to_rgb, rgb_to_hex, etc.)
 function M.utils()
   return get_utils()
+end
+
+-- ============================================================================
+-- Presets
+-- ============================================================================
+
+---Get color presets module
+---@return table Presets module
+function M.presets()
+  return get_presets()
+end
+
+---Get available preset names
+---@return string[] names
+function M.get_preset_names()
+  return get_presets().get_preset_names()
+end
+
+---Search presets for a color by name
+---@param query string Search query
+---@return table[] matches
+function M.search_presets(query)
+  return get_presets().search(query)
+end
+
+-- ============================================================================
+-- Clipboard & History
+-- ============================================================================
+
+---Get history module
+---@return table History module
+function M.history()
+  return get_history()
+end
+
+---Copy color to clipboard
+---@param hex string? Hex color (default: color at cursor)
+---@param format "hex"|"rgb"|"hsl"|"hsv"? Format
+function M.yank(hex, format)
+  if not hex then
+    get_history().yank_at_cursor(format)
+  else
+    get_history().yank(hex, format)
+  end
+end
+
+---Paste color from clipboard
+---@return string? hex Parsed hex color
+function M.paste()
+  return get_history().paste()
+end
+
+---Get recent colors
+---@param count number? Max colors
+---@return string[] colors
+function M.get_recent_colors(count)
+  return get_history().get_recent(count)
+end
+
+---Add color to recent history
+---@param hex string Hex color
+function M.add_recent_color(hex)
+  get_history().add_recent(hex)
+end
+
+-- ============================================================================
+-- Buffer Highlighting
+-- ============================================================================
+
+---Get highlight module
+---@return table Highlight module
+function M.highlight()
+  return get_highlight()
+end
+
+---Toggle color highlighting in current buffer
+function M.toggle_highlight()
+  get_highlight().toggle()
+end
+
+---Enable color highlighting in current buffer
+function M.enable_highlight()
+  get_highlight().highlight_buffer()
+end
+
+---Disable color highlighting in current buffer
+function M.disable_highlight()
+  get_highlight().clear_buffer()
+end
+
+---Enable auto-highlighting for file patterns
+---@param patterns string[]? File patterns
+function M.enable_auto_highlight(patterns)
+  get_highlight().enable_auto(patterns)
+end
+
+---Disable auto-highlighting
+function M.disable_auto_highlight()
+  get_highlight().disable_auto()
+end
+
+---Set highlight mode
+---@param mode "background"|"foreground"|"virtualtext"
+function M.set_highlight_mode(mode)
+  get_highlight().set_mode(mode)
 end
 
 return M
