@@ -191,16 +191,9 @@ end
 local function update_panels()
   if not state or not results then return end
 
-  local left = state.panels.categories
-  local right = state.panels.details
-
-  if left and vim.api.nvim_win_is_valid(left.winid) then
-    left:update_styled(build_category_list(results))
-  end
-
-  if right and vim.api.nvim_win_is_valid(right.winid) then
-    right:update_styled(build_detail_panel(results))
-  end
+  -- Use multipanel's render_panel which calls the on_render callbacks
+  state:render_panel("categories")
+  state:render_panel("details")
 end
 
 -- ============================================================================
@@ -277,12 +270,7 @@ end
 ---Close the viewer
 local function close_viewer()
   if state then
-    -- Close all panels
-    for _, panel in pairs(state.panels) do
-      if panel and panel.winid and vim.api.nvim_win_is_valid(panel.winid) then
-        vim.api.nvim_win_close(panel.winid, true)
-      end
-    end
+    state:close()
     state = nil
   end
 end
@@ -307,25 +295,41 @@ function M.show(data)
   -- Ensure nvim-float is setup
   nf.setup()
 
-  -- Create multipanel layout
+  -- Create multipanel layout using correct API
   state = nf.create_multi_panel({
-    layout = "horizontal",
-    panels = {
-      {
-        id = "categories",
-        title = " Categories ",
-        width = 0.35,
-        content_builder = build_category_list(data),
-      },
-      {
-        id = "details",
-        title = " Details ",
-        width = 0.65,
-        content_builder = build_detail_panel(data),
+    layout = {
+      split = "horizontal",
+      children = {
+        {
+          name = "categories",
+          title = " Categories ",
+          ratio = 0.35,
+          on_render = function()
+            local cb = build_category_list(results)
+            return cb:build_lines(), cb:build_highlights()
+          end,
+        },
+        {
+          name = "details",
+          title = " Details ",
+          ratio = 0.65,
+          on_render = function()
+            local cb = build_detail_panel(results)
+            return cb:build_lines(), cb:build_highlights()
+          end,
+        },
       },
     },
-    total_width = 120,
-    total_height = 30,
+    total_width_ratio = 0.75,
+    total_height_ratio = 0.75,
+    initial_focus = "categories",
+    controls = {
+      { key = "j/k", action = "Navigate" },
+      { key = "l/Enter", action = "View details" },
+      { key = "h", action = "Back to summary" },
+      { key = "r", action = "Re-run tests" },
+      { key = "q", action = "Close" },
+    },
   })
 
   if not state then
@@ -333,33 +337,30 @@ function M.show(data)
     return
   end
 
-  -- Setup keymaps on the categories panel
-  local left = state.panels.categories
-  if left and left.bufnr and vim.api.nvim_buf_is_valid(left.bufnr) then
-    local opts = { buffer = left.bufnr, nowait = true }
+  -- Render initial content
+  state:render_all()
 
-    vim.keymap.set("n", "j", next_category, opts)
-    vim.keymap.set("n", "k", prev_category, opts)
-    vim.keymap.set("n", "l", enter_category, opts)
-    vim.keymap.set("n", "<CR>", enter_category, opts)
-    vim.keymap.set("n", "h", back_to_summary, opts)
-    vim.keymap.set("n", "r", rerun_tests, opts)
-    vim.keymap.set("n", "q", close_viewer, opts)
-    vim.keymap.set("n", "<Esc>", close_viewer, opts)
-  end
+  -- Setup keymaps on the categories panel
+  state:set_panel_keymaps("categories", {
+    ["j"] = next_category,
+    ["k"] = prev_category,
+    ["l"] = enter_category,
+    ["<CR>"] = enter_category,
+    ["h"] = back_to_summary,
+    ["r"] = rerun_tests,
+    ["q"] = close_viewer,
+    ["<Esc>"] = close_viewer,
+  })
 
   -- Setup keymaps on the details panel
-  local right = state.panels.details
-  if right and right.bufnr and vim.api.nvim_buf_is_valid(right.bufnr) then
-    local opts = { buffer = right.bufnr, nowait = true }
-
-    vim.keymap.set("n", "j", next_file, opts)
-    vim.keymap.set("n", "k", prev_file, opts)
-    vim.keymap.set("n", "h", back_to_summary, opts)
-    vim.keymap.set("n", "r", rerun_tests, opts)
-    vim.keymap.set("n", "q", close_viewer, opts)
-    vim.keymap.set("n", "<Esc>", close_viewer, opts)
-  end
+  state:set_panel_keymaps("details", {
+    ["j"] = next_file,
+    ["k"] = prev_file,
+    ["h"] = back_to_summary,
+    ["r"] = rerun_tests,
+    ["q"] = close_viewer,
+    ["<Esc>"] = close_viewer,
+  })
 end
 
 ---Close the viewer if open
