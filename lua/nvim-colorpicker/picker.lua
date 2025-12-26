@@ -1100,12 +1100,15 @@ local function apply()
   if not state then return end
 
   local result = vim.deepcopy(state.current)
+  local on_select = state.options.on_select
 
-  if state.options.on_select then
-    state.options.on_select(result)
-  end
-
+  -- Close picker FIRST so original buffer is current when callback runs
   ColorPicker.close()
+
+  -- Then call the callback (now the original buffer should be focused)
+  if on_select then
+    on_select(result)
+  end
 end
 
 ---Cancel and close
