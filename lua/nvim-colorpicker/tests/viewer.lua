@@ -207,13 +207,14 @@ local function prev_category()
   update_panels()
 end
 
----Enter category to view files
+---Enter category to view files (and focus details panel)
 local function enter_category()
-  if not results then return end
+  if not results or not state then return end
   local category = results.categories[selected_category]
-  if category and #category.files > 0 then
-    selected_file = 1
+  if category then
+    selected_file = 0  -- Show category summary first
     update_panels()
+    state:focus_panel("details")
   end
 end
 
@@ -223,25 +224,65 @@ local function back_to_summary()
   update_panels()
 end
 
----Next file in category
+---Next file in category (or next category if at last file)
 local function next_file()
   if not results then return end
   local category = results.categories[selected_category]
   if not category then return end
 
   if selected_file == 0 then
-    selected_file = 1
+    -- At category summary, go to first file
+    if #category.files > 0 then
+      selected_file = 1
+    end
+  elseif selected_file < #category.files then
+    -- Go to next file
+    selected_file = selected_file + 1
   else
-    selected_file = math.min(selected_file + 1, #category.files)
+    -- At last file, go to next category
+    if selected_category < #results.categories then
+      selected_category = selected_category + 1
+      selected_file = 0
+    end
   end
   update_panels()
 end
 
----Previous file in category
+---Previous file in category (or prev category if at first)
 local function prev_file()
   if not results then return end
-  selected_file = math.max(selected_file - 1, 0)
+
+  if selected_file > 0 then
+    -- Go to previous file or category summary
+    selected_file = selected_file - 1
+  elseif selected_category > 1 then
+    -- At category summary, go to previous category's last file
+    selected_category = selected_category - 1
+    local prev_cat = results.categories[selected_category]
+    selected_file = prev_cat and #prev_cat.files or 0
+  end
   update_panels()
+end
+
+---Go back - if viewing file go to summary, if at summary focus categories
+local function go_back()
+  if selected_file > 0 then
+    selected_file = 0
+    update_panels()
+  else
+    -- Focus categories panel
+    state:focus_panel("categories")
+  end
+end
+
+---Drill into details - if at summary, show first file
+local function drill_in()
+  if not results then return end
+  local category = results.categories[selected_category]
+  if category and selected_file == 0 and #category.files > 0 then
+    selected_file = 1
+    update_panels()
+  end
 end
 
 -- ============================================================================
@@ -316,17 +357,26 @@ function M.show(data)
     initial_focus = "categories",
     controls = {
       {
-        header = "Navigation",
+        header = "Categories Panel",
         keys = {
-          { key = "j/k", desc = "Navigate items" },
-          { key = "l/Enter", desc = "View details" },
-          { key = "h", desc = "Back to summary" },
-          { key = "Tab", desc = "Switch panel" },
+          { key = "j/k", desc = "Navigate categories" },
+          { key = "l/Enter", desc = "Select category" },
         },
       },
       {
-        header = "Actions",
+        header = "Details Panel",
         keys = {
+          { key = "j/k", desc = "Scroll content (vim default)" },
+          { key = "]/n", desc = "Next file/category" },
+          { key = "[/N", desc = "Previous file/category" },
+          { key = "l", desc = "Drill into file" },
+          { key = "h", desc = "Back / focus categories" },
+        },
+      },
+      {
+        header = "General",
+        keys = {
+          { key = "Tab", desc = "Switch panel focus" },
           { key = "r", desc = "Re-run tests" },
           { key = "q/Esc", desc = "Close" },
         },
@@ -365,10 +415,14 @@ function M.show(data)
   })
 
   -- Setup keymaps on the details panel
+  -- Note: j/k are NOT overridden so normal vim scrolling works
   state:set_panel_keymaps("details", {
-    ["j"] = next_file,
-    ["k"] = prev_file,
-    ["h"] = back_to_summary,
+    ["]"] = next_file,        -- Next file/category
+    ["["] = prev_file,        -- Previous file/category
+    ["n"] = next_file,        -- Alternative: next
+    ["N"] = prev_file,        -- Alternative: previous
+    ["h"] = go_back,          -- Back to summary or focus categories
+    ["l"] = drill_in,         -- Drill into file details
     ["r"] = rerun_tests,
     ["q"] = close_viewer,
     ["<Esc>"] = close_viewer,
