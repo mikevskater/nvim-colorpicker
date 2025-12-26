@@ -72,15 +72,6 @@ local function build_category_list(data)
     end
   end
 
-  cb:blank()
-  cb:separator()
-  cb:blank()
-  cb:muted("  [j/k] Navigate")
-  cb:muted("  [l/Enter] View details")
-  cb:muted("  [h] Back to summary")
-  cb:muted("  [r] Re-run tests")
-  cb:muted("  [q] Close")
-
   return cb
 end
 
@@ -324,11 +315,22 @@ function M.show(data)
     total_height_ratio = 0.75,
     initial_focus = "categories",
     controls = {
-      { key = "j/k", action = "Navigate" },
-      { key = "l/Enter", action = "View details" },
-      { key = "h", action = "Back to summary" },
-      { key = "r", action = "Re-run tests" },
-      { key = "q", action = "Close" },
+      {
+        header = "Navigation",
+        keys = {
+          { key = "j/k", desc = "Navigate items" },
+          { key = "l/Enter", desc = "View details" },
+          { key = "h", desc = "Back to summary" },
+          { key = "Tab", desc = "Switch panel" },
+        },
+      },
+      {
+        header = "Actions",
+        keys = {
+          { key = "r", desc = "Re-run tests" },
+          { key = "q/Esc", desc = "Close" },
+        },
+      },
     },
   })
 
@@ -340,6 +342,14 @@ function M.show(data)
   -- Render initial content
   state:render_all()
 
+  -- Panel switching functions
+  local function focus_next()
+    state:focus_next_panel()
+  end
+  local function focus_prev()
+    state:focus_prev_panel()
+  end
+
   -- Setup keymaps on the categories panel
   state:set_panel_keymaps("categories", {
     ["j"] = next_category,
@@ -350,6 +360,8 @@ function M.show(data)
     ["r"] = rerun_tests,
     ["q"] = close_viewer,
     ["<Esc>"] = close_viewer,
+    ["<Tab>"] = focus_next,
+    ["<S-Tab>"] = focus_prev,
   })
 
   -- Setup keymaps on the details panel
@@ -360,6 +372,8 @@ function M.show(data)
     ["r"] = rerun_tests,
     ["q"] = close_viewer,
     ["<Esc>"] = close_viewer,
+    ["<Tab>"] = focus_next,
+    ["<S-Tab>"] = focus_prev,
   })
 end
 
