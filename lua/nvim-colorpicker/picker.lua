@@ -57,7 +57,8 @@ local InputManager = require('nvim-float.input_manager')
 ---@field _render_timer number? Timer handle for debounced render
 ---@field color_mode "hsl"|"rgb"|"cmyk"|"hsv" Current color mode for info panel
 ---@field value_format "standard"|"decimal" Value display format
----@field alpha number Alpha value 0-100
+---@field alpha number Current alpha value 0-100
+---@field original_alpha number Original alpha value 0-100 (for preview comparison)
 ---@field alpha_enabled boolean Whether alpha editing is available
 ---@field focused_panel "grid"|"info" Currently focused panel
 ---@field _multipanel table? MultiPanelWindow instance (for multipanel mode)
@@ -370,9 +371,10 @@ local function render_preview()
   -- Get colors and alpha chars
   local orig_color = state.original.color or "#808080"
   local curr_color = state.current.color or "#808080"
+  local orig_alpha = state.original_alpha or 100
   local curr_alpha = state.alpha or 100
 
-  local orig_char = "█"  -- Original always solid
+  local orig_char = get_alpha_char(orig_alpha)
   local curr_char = get_alpha_char(curr_alpha)
 
   -- Set up highlight groups
@@ -1634,6 +1636,7 @@ function ColorPicker.show_multipanel(options)
     color_mode = options.forced_mode or "hsl",
     value_format = "standard",
     alpha = options.initial_alpha or 100,
+    original_alpha = options.initial_alpha or 100,
     alpha_enabled = options.alpha_enabled or false,
     focused_panel = "grid",
     _render_pending = false,
