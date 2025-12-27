@@ -171,8 +171,9 @@ end
 
 ---Set the current color in an open picker (for external updates like fg/bg switching)
 ---@param hex string The new hex color
-function M.set_color(hex)
-  get_picker().set_color(hex)
+---@param original_hex string? Optional original color for reset/comparison
+function M.set_color(hex, original_hex)
+  get_picker().set_color(hex, original_hex)
 end
 
 ---Get the current color from an open picker

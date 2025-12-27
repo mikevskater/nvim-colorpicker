@@ -1756,11 +1756,27 @@ end
 
 ---Set the current color (for external updates, e.g., when switching fg/bg target)
 ---@param hex string The new hex color
-function ColorPicker.set_color(hex)
-  if not state then return end
+---@param original_hex string? Optional original color for reset/comparison (defaults to same as hex)
+function ColorPicker.set_color(hex, original_hex)
+  vim.notify(string.format("PICKER set_color called: hex=%s, original_hex=%s", hex or "nil", original_hex or "nil"))
+  if not state then
+    vim.notify("  ERROR: state is nil!")
+    return
+  end
 
   hex = ColorUtils.normalize_hex(hex)
+  vim.notify(string.format("  Setting state.current.color = %s (was %s)", hex, state.current.color))
   state.current.color = hex
+
+  -- Also update original if provided (for target switching scenarios)
+  if original_hex then
+    local normalized_original = ColorUtils.normalize_hex(original_hex)
+    vim.notify(string.format("  Setting state.original.color = %s (was %s)", normalized_original, state.original.color))
+    state.original.color = normalized_original
+    state.original_alpha = state.alpha  -- Keep alpha in sync
+  else
+    vim.notify("  original_hex not provided, original unchanged")
+  end
 
   -- Update saved HSL for grid positioning
   local h, s, _ = ColorUtils.hex_to_hsl(hex)
@@ -1771,6 +1787,7 @@ function ColorPicker.set_color(hex)
   state.saturation_virtual = nil
 
   schedule_render()
+  vim.notify("  set_color complete, render scheduled")
 end
 
 ---Get the current color
