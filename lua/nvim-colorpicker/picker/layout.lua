@@ -9,6 +9,19 @@ local ContentBuilder = require('nvim-float.content_builder')
 
 local M = {}
 
+-- Lazy-loaded tab renderers to avoid circular dependencies
+local function get_info_tab()
+  return require('nvim-colorpicker.picker.info_tab')
+end
+
+local function get_history_tab()
+  return require('nvim-colorpicker.picker.history_tab')
+end
+
+local function get_tabs()
+  return require('nvim-colorpicker.picker.tabs')
+end
+
 -- ============================================================================
 -- Local References
 -- ============================================================================
@@ -207,6 +220,69 @@ function M.render_grid_panel(multi_state)
   end
 
   return all_lines, all_highlights
+end
+
+-- ============================================================================
+-- Right Panel (Tab-Aware) Rendering
+-- ============================================================================
+
+---Render the right panel content based on active tab
+---@param multi_state MultiPanelState
+---@return string[] lines
+---@return table[] highlights
+function M.render_right_panel(multi_state)
+  local state = State.state
+  if not state then return {}, {} end
+
+  local active_tab = state.active_tab or "info"
+
+  if active_tab == "info" then
+    return get_info_tab().render_info_panel(multi_state)
+  elseif active_tab == "history" then
+    return get_history_tab().render_history_panel(multi_state)
+  elseif active_tab == "presets" then
+    -- Presets tab will be implemented in Phase 2
+    -- For now, show placeholder
+    local Tabs = get_tabs()
+    local cb = ContentBuilder.new()
+
+    local tab_lines, tab_highlights = Tabs.render_tab_bar()
+    local all_lines = {}
+    local all_highlights = {}
+
+    for _, line in ipairs(tab_lines) do
+      table.insert(all_lines, line)
+    end
+    for _, hl in ipairs(tab_highlights) do
+      table.insert(all_highlights, hl)
+    end
+
+    cb:blank()
+    cb:styled("  Presets", "header")
+    cb:blank()
+    cb:styled("  Coming soon...", "muted")
+
+    local content_lines = cb:build_lines()
+    local content_highlights = cb:build_highlights()
+    local line_offset = #all_lines
+
+    for _, line in ipairs(content_lines) do
+      table.insert(all_lines, line)
+    end
+    for _, hl in ipairs(content_highlights) do
+      table.insert(all_highlights, {
+        line = hl.line + line_offset,
+        col_start = hl.col_start,
+        col_end = hl.col_end,
+        hl_group = hl.hl_group,
+      })
+    end
+
+    return all_lines, all_highlights
+  end
+
+  -- Fallback to info tab
+  return get_info_tab().render_info_panel(multi_state)
 end
 
 -- ============================================================================

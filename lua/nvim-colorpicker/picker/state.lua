@@ -93,6 +93,12 @@ function M.init_state(initial, options, grid_width, grid_height, preview_rows, n
     _render_pending = false,
     _keymaps = resolved_keymaps,
     custom_values = {},
+    -- Tab system state
+    active_tab = "info",
+    history_cursor = 1,
+    presets_cursor = 1,
+    presets_expanded = {},
+    presets_search = "",
   }
 
   -- Initialize custom control values from defaults

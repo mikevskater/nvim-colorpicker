@@ -4,8 +4,14 @@
 local State = require('nvim-colorpicker.picker.state')
 local Navigation = require('nvim-colorpicker.picker.navigation')
 local Config = require('nvim-colorpicker.config')
+local Tabs = require('nvim-colorpicker.picker.tabs')
 
 local M = {}
+
+-- Lazy-loaded to avoid circular dependencies
+local function get_history_tab()
+  return require('nvim-colorpicker.picker.history_tab')
+end
 
 -- ============================================================================
 -- Controls Definition (for UiFloat help popup)
@@ -36,6 +42,14 @@ function M.get_controls_definition()
       keys = {
         { key = "m", desc = "Cycle mode (HSL/RGB/CMYK/HSV)" },
         { key = "f", desc = "Toggle format (standard/decimal)" },
+      }
+    },
+    {
+      header = "Tabs",
+      keys = {
+        { key = "1", desc = "Info tab" },
+        { key = "2", desc = "History tab" },
+        { key = "3", desc = "Presets tab" },
       }
     },
     {
@@ -201,7 +215,65 @@ function M.setup_multipanel_keymaps(multi, schedule_render, apply, cancel)
     end
   end
 
+  -- Tab switching keymaps
+  common_keymaps["1"] = function()
+    Tabs.switch_tab("info", schedule_render)
+  end
+  common_keymaps["2"] = function()
+    Tabs.switch_tab("history", schedule_render)
+  end
+  common_keymaps["3"] = function()
+    Tabs.switch_tab("presets", schedule_render)
+  end
+
   multi:set_keymaps(common_keymaps)
+
+  -- Info panel-specific keymaps (set on info panel)
+  local info_keymaps = {}
+  -- Info panel has InputManager, so most navigation is handled there
+  multi:set_panel_keymaps("info", info_keymaps)
+end
+
+-- ============================================================================
+-- History Tab Keymaps
+-- ============================================================================
+
+---Setup history-specific keymaps when history tab is active
+---@param multi MultiPanelState
+---@param schedule_render fun() Function to schedule a render
+function M.setup_history_keymaps(multi, schedule_render)
+  local state = State.state
+  if not state then return end
+
+  local HistoryTab = get_history_tab()
+
+  local history_keymaps = {}
+
+  history_keymaps["j"] = function()
+    HistoryTab.cursor_down(schedule_render)
+  end
+  history_keymaps["k"] = function()
+    HistoryTab.cursor_up(schedule_render)
+  end
+  history_keymaps["<CR>"] = function()
+    HistoryTab.select_current(schedule_render)
+  end
+  history_keymaps["d"] = function()
+    HistoryTab.delete_current(schedule_render)
+  end
+  history_keymaps["c"] = function()
+    HistoryTab.clear_all(schedule_render)
+  end
+
+  -- Apply these keymaps to the info panel (which shows history content when history tab is active)
+  multi:set_panel_keymaps("info", history_keymaps)
+end
+
+---Clear history-specific keymaps (when switching away from history tab)
+---@param multi MultiPanelState
+function M.clear_history_keymaps(multi)
+  -- Reset to empty keymaps for the info panel
+  multi:set_panel_keymaps("info", {})
 end
 
 return M

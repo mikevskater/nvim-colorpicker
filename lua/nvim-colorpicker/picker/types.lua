@@ -62,6 +62,11 @@ local M = {}
 ---@field _info_input_manager table? InputManager for info panel
 ---@field _keymaps table? Resolved keymaps
 ---@field custom_values table<string, any> Current values for custom controls
+---@field active_tab "info"|"history"|"presets" Currently active tab in right panel
+---@field history_cursor number Selected item index in history tab
+---@field presets_cursor number Selected item index in presets tab
+---@field presets_expanded table<string, boolean> Expanded state of preset categories
+---@field presets_search string Current search query in presets tab
 
 -- ============================================================================
 -- Layout Constants

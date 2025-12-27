@@ -10,10 +10,11 @@ local Grid = require('nvim-colorpicker.picker.grid')
 local Preview = require('nvim-colorpicker.picker.preview')
 local Layout = require('nvim-colorpicker.picker.layout')
 local Navigation = require('nvim-colorpicker.picker.navigation')
-local InfoPanel = require('nvim-colorpicker.picker.info_panel')
+local InfoPanel = require('nvim-colorpicker.picker.info_tab')
 local Keymaps = require('nvim-colorpicker.picker.keymaps')
 local ColorUtils = require('nvim-colorpicker.color')
 local Config = require('nvim-colorpicker.config')
+local History = require('nvim-colorpicker.history')
 local UiFloat = require('nvim-float.float')
 local MultiPanel = require('nvim-float.float.multipanel')
 
@@ -34,17 +35,33 @@ local function render_multipanel()
   if not state or not state._multipanel then return end
 
   local multi = state._multipanel
+  local active_tab = state.active_tab or "info"
 
   multi:render_panel("grid")
   multi:render_panel("info")
 
-  if state._info_input_manager and state._info_panel_cb then
-    local cb = state._info_panel_cb
-    state._info_input_manager:update_inputs(
-      cb:get_inputs(),
-      cb:get_input_order()
-    )
-    InfoPanel.update_input_validation_settings()
+  -- Handle tab-specific InputManager lifecycle
+  if active_tab == "info" then
+    -- Setup or update InputManager for info tab
+    if state._info_input_manager and state._info_panel_cb then
+      local cb = state._info_panel_cb
+      state._info_input_manager:update_inputs(
+        cb:get_inputs(),
+        cb:get_input_order()
+      )
+      InfoPanel.update_input_validation_settings()
+    elseif state._info_panel_cb and not state._info_input_manager then
+      -- Need to setup InputManager
+      InfoPanel.setup_info_panel_input_manager(multi, schedule_render)
+    end
+    -- Clear history keymaps when not on history tab
+    Keymaps.clear_history_keymaps(multi)
+  elseif active_tab == "history" then
+    -- Setup history keymaps
+    Keymaps.setup_history_keymaps(multi, schedule_render)
+  else
+    -- Clear history keymaps for other tabs
+    Keymaps.clear_history_keymaps(multi)
   end
 
   if state.options.on_change then
@@ -94,6 +111,11 @@ local function apply()
     result.custom = vim.deepcopy(state.custom_values)
   end
   local on_select = state.options.on_select
+
+  -- Add selected color to history
+  if result.color then
+    History.add_recent(result.color)
+  end
 
   ColorPicker.close()
 
@@ -178,7 +200,7 @@ function ColorPicker.show_multipanel(options)
   end
 
   layout_config.layout.children[1].on_render = Layout.render_grid_panel
-  layout_config.layout.children[2].on_render = InfoPanel.render_info_panel
+  layout_config.layout.children[2].on_render = Layout.render_right_panel
 
   layout_config.layout.children[1].on_focus = function(multi_state)
     if State.state then State.state.focused_panel = "grid" end
@@ -192,9 +214,11 @@ function ColorPicker.show_multipanel(options)
 
   layout_config.layout.children[2].on_focus = function(multi_state)
     if State.state then State.state.focused_panel = "info" end
-    multi_state:update_panel_title("info", "Info *")
+    local Tabs = require('nvim-colorpicker.picker.tabs')
+    multi_state:update_panel_title("info", Tabs.get_panel_title(true))
     multi_state:update_panel_title("grid", grid_title)
-    if State.state and State.state._info_input_manager then
+    -- Only focus input field if on info tab
+    if State.state and State.state.active_tab == "info" and State.state._info_input_manager then
       vim.schedule(function()
         if State.state and State.state._info_input_manager then
           State.state._info_input_manager:focus_first_field()
@@ -204,7 +228,8 @@ function ColorPicker.show_multipanel(options)
   end
 
   layout_config.layout.children[2].on_blur = function(multi_state)
-    multi_state:update_panel_title("info", "Info")
+    local Tabs = require('nvim-colorpicker.picker.tabs')
+    multi_state:update_panel_title("info", Tabs.get_panel_title(false))
   end
 
   layout_config.controls = Keymaps.get_controls_definition()
@@ -340,23 +365,15 @@ end
 ---@param original_hex string? Optional original color for reset/comparison (defaults to same as hex)
 function ColorPicker.set_color(hex, original_hex)
   local state = State.state
-  vim.notify(string.format("PICKER set_color called: hex=%s, original_hex=%s", hex or "nil", original_hex or "nil"))
-  if not state then
-    vim.notify("  ERROR: state is nil!")
-    return
-  end
+  if not state then return end
 
   hex = ColorUtils.normalize_hex(hex)
-  vim.notify(string.format("  Setting state.current.color = %s (was %s)", hex, state.current.color))
   state.current.color = hex
 
   if original_hex then
     local normalized_original = ColorUtils.normalize_hex(original_hex)
-    vim.notify(string.format("  Setting state.original.color = %s (was %s)", normalized_original, state.original.color))
     state.original.color = normalized_original
     state.original_alpha = state.alpha
-  else
-    vim.notify("  original_hex not provided, original unchanged")
   end
 
   local h, s, _ = ColorUtils.hex_to_hsl(hex)
@@ -366,7 +383,6 @@ function ColorPicker.set_color(hex, original_hex)
   state.saturation_virtual = nil
 
   schedule_render()
-  vim.notify("  set_color complete, render scheduled")
 end
 
 ---Get the current color
