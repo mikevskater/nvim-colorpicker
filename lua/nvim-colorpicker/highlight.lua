@@ -61,6 +61,13 @@ function M.highlight_buffer(bufnr)
   -- Clear existing highlights
   vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
 
+  -- Get config for swatch character (only needed for virtualtext mode)
+  local swatch_char
+  if highlight_mode == "virtualtext" then
+    local config = require('nvim-colorpicker.config').get()
+    swatch_char = (config.highlight and config.highlight.swatch_char) or '■'
+  end
+
   -- Get all lines
   local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
 
@@ -74,9 +81,9 @@ function M.highlight_buffer(bufnr)
       local hl_name = get_or_create_hl(color_info.color)
 
       if highlight_mode == "virtualtext" then
-        -- Add virtual text swatch after the color
-        vim.api.nvim_buf_set_extmark(bufnr, ns, line_num, color_info.end_col, {
-          virt_text = { { "■", hl_name } },
+        -- Add virtual text swatch BEFORE the color
+        vim.api.nvim_buf_set_extmark(bufnr, ns, line_num, color_info.start_col, {
+          virt_text = { { swatch_char, hl_name } },
           virt_text_pos = "inline",
         })
       else

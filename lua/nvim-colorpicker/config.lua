@@ -12,6 +12,7 @@
 ---@field filetypes string[]|"*" Filetypes to enable highlighting ("*" for all)
 ---@field exclude_filetypes string[] Filetypes to exclude from highlighting
 ---@field mode "background"|"foreground"|"virtualtext" Highlight display mode
+---@field swatch_char string Character to use for virtualtext swatch (default: "■")
 
 ---@class NvimColorPickerKeymaps
 ---@field nav_left string|string[] Move left in grid (decrease hue)
@@ -55,6 +56,7 @@ M.defaults = {
     filetypes = '*', -- '*' for all filetypes, or list like {'css', 'html', 'lua'}
     exclude_filetypes = { 'lazy', 'mason', 'help', 'TelescopePrompt' },
     mode = 'background', -- 'background', 'foreground', or 'virtualtext'
+    swatch_char = '■',   -- Character for virtualtext swatch (e.g., '●', '▓', '█', '◼')
   },
 
   keymaps = {
