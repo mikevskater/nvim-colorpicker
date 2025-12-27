@@ -23,10 +23,6 @@
 ---@field sat_down string|string[] Decrease saturation
 ---@field step_down string|string[] Decrease step size
 ---@field step_up string|string[] Increase step size
----@field toggle_bold string|string[] Toggle bold style
----@field toggle_italic string|string[] Toggle italic style
----@field toggle_bg string|string[] Toggle foreground/background editing
----@field clear_bg string|string[] Clear background color
 ---@field reset string|string[] Reset to original color
 ---@field hex_input string|string[] Enter hex color manually
 ---@field apply string|string[] Apply and close
@@ -73,12 +69,6 @@ M.defaults = {
     -- Step size adjustment
     step_down = '-',
     step_up = { '+', '=' },
-
-    -- Style toggles
-    toggle_bold = 'b',
-    toggle_italic = 'i',
-    toggle_bg = 'B',
-    clear_bg = 'x',
 
     -- Actions
     reset = 'r',

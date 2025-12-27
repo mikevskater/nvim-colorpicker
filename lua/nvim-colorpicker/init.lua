@@ -28,7 +28,7 @@
 local M = {}
 
 ---Plugin version
-M.version = '1.0.1'
+M.version = '1.1.0'
 
 -- Lazy-load modules
 local function get_config()
@@ -111,8 +111,8 @@ function M.pick_at_cursor()
     alpha_enabled = true,  -- Always allow alpha editing
     initial_alpha = color_info.alpha or 100,  -- Use detected alpha or default to 100
     on_select = function(result)
-      -- result is {fg, bg, bold, italic, alpha} - extract the appropriate color
-      local new_color = result.fg or result.bg or color_info.color
+      -- result is {color, alpha} - extract the color
+      local new_color = result.color or color_info.color
       detect.replace_color_at_cursor(new_color, color_info, result.alpha)
     end,
   })

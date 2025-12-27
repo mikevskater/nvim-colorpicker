@@ -14,9 +14,7 @@ local InputManager = require('nvim-float.input_manager')
 -- ============================================================================
 
 ---@class NvimColorPickerColor
----@field fg string? Foreground hex color
----@field bg string? Background hex color
----@field underline boolean?
+---@field color string The hex color
 
 ---@class NvimColorPickerCustomControl
 ---@field id string Unique identifier for this control
@@ -43,7 +41,6 @@ local InputManager = require('nvim-float.input_manager')
 ---@class NvimColorPickerState
 ---@field current NvimColorPickerColor Current working color
 ---@field original NvimColorPickerColor Original color for reset
----@field editing_bg boolean Whether editing background instead of foreground
 ---@field grid_width number Current grid width
 ---@field grid_height number Current grid height
 ---@field win number? Window handle
@@ -123,27 +120,19 @@ local state = nil
 -- Helpers
 -- ============================================================================
 
----Get the active color (fg or bg based on editing mode)
+---Get the current color
 ---@return string hex
 local function get_active_color()
   if not state then return "#808080" end
-  if state.editing_bg then
-    return state.current.bg or "#1E1E1E"
-  else
-    return state.current.fg or "#FFFFFF"
-  end
+  return state.current.color or "#808080"
 end
 
----Set the active color
+---Set the current color
 ---@param hex string
 local function set_active_color(hex)
   if not state then return end
   hex = ColorUtils.normalize_hex(hex)
-  if state.editing_bg then
-    state.current.bg = hex
-  else
-    state.current.fg = hex
-  end
+  state.current.color = hex
 end
 
 ---Get current step multiplier
@@ -427,27 +416,14 @@ local function apply_swatch_highlights(base_line, swatch_info)
   local orig_hl_name = "NvimColorPickerOriginalPreview"
   local curr_hl_name = "NvimColorPickerCurrentPreview"
 
-  local orig_color = state.editing_bg
-    and (state.original.bg or "none")
-    or (state.original.fg or "none")
-
-  if orig_color ~= "none" then
-    vim.api.nvim_set_hl(0, orig_hl_name, {
-      fg = state.original.fg,
-      bg = state.original.bg,
-      bold = state.original.bold,
-      italic = state.original.italic,
-    })
+  local orig_color = state.original.color
+  if orig_color then
+    vim.api.nvim_set_hl(0, orig_hl_name, { fg = orig_color })
   else
     vim.api.nvim_set_hl(0, orig_hl_name, { fg = "#808080", italic = true })
   end
 
-  vim.api.nvim_set_hl(0, curr_hl_name, {
-    fg = state.current.fg,
-    bg = state.current.bg,
-    bold = state.current.bold,
-    italic = state.current.italic,
-  })
+  vim.api.nvim_set_hl(0, curr_hl_name, { fg = state.current.color })
 
   local orig_info = swatch_info.original
   local curr_info = swatch_info.current
@@ -740,15 +716,6 @@ local function render_info_panel(multi_state)
     { text = "  -/+", style = "key" },
   })
 
-  cb:blank()
-
-  -- fg/bg mode
-  local mode_ind = state.editing_bg and "[bg]" or "[fg]"
-  cb:spans({
-    { text = "  " .. mode_ind, style = "muted" },
-    { text = "  B", style = "key" },
-  })
-
   -- Render custom controls if any
   if state.options.custom_controls and #state.options.custom_controls > 0 then
     cb:blank()
@@ -758,25 +725,30 @@ local function render_info_panel(multi_state)
 
     for _, control in ipairs(state.options.custom_controls) do
       local value = state.custom_values[control.id]
+      local key_hint = control.key and ("  " .. control.key) or ""
       if control.type == "toggle" then
         local indicator = value and "[x]" or "[ ]"
         cb:spans({
           { text = "  " .. indicator .. " " .. control.label, style = value and "emphasis" or "muted" },
+          { text = key_hint, style = "key" },
         })
       elseif control.type == "select" then
         cb:spans({
           { text = "  " .. control.label .. ": ", style = "label" },
           { text = tostring(value), style = "value" },
+          { text = key_hint, style = "key" },
         })
       elseif control.type == "number" then
         cb:spans({
           { text = "  " .. control.label .. ": ", style = "label" },
           { text = tostring(value), style = "value" },
+          { text = key_hint, style = "key" },
         })
       elseif control.type == "text" then
         cb:spans({
           { text = "  " .. control.label .. ": ", style = "label" },
           { text = tostring(value), style = "value" },
+          { text = key_hint, style = "key" },
         })
       end
     end
@@ -1011,25 +983,54 @@ local function shift_saturation(delta)
   schedule_render()
 end
 
----Toggle editing fg/bg
-local function toggle_bg_mode()
-  if not state then return end
-  state.editing_bg = not state.editing_bg
-  schedule_render()
-end
-
 ---Reset to original color
 local function reset_color()
   if not state then return end
   state.current = vim.deepcopy(state.original)
-  state.editing_bg = false
   schedule_render()
 end
 
----Clear background color
-local function clear_bg()
-  if not state then return end
-  state.current.bg = nil
+---Toggle or cycle a custom control value
+---@param control_id string The control ID
+local function toggle_custom_control(control_id)
+  if not state or not state.options.custom_controls then return end
+
+  -- Find the control definition
+  local control = nil
+  for _, ctrl in ipairs(state.options.custom_controls) do
+    if ctrl.id == control_id then
+      control = ctrl
+      break
+    end
+  end
+
+  if not control then return end
+
+  local current = state.custom_values[control_id]
+
+  if control.type == "toggle" then
+    state.custom_values[control_id] = not current
+  elseif control.type == "select" then
+    -- Cycle through options
+    local current_idx = 1
+    for i, opt in ipairs(control.options) do
+      if opt == current then
+        current_idx = i
+        break
+      end
+    end
+    local next_idx = (current_idx % #control.options) + 1
+    state.custom_values[control_id] = control.options[next_idx]
+  elseif control.type == "number" then
+    -- Increment with step, wrap at max
+    local step = control.step or 1
+    local min_val = control.min or 0
+    local max_val = control.max or 100
+    local new_val = current + step
+    if new_val > max_val then new_val = min_val end
+    state.custom_values[control_id] = new_val
+  end
+
   schedule_render()
 end
 
@@ -1108,6 +1109,10 @@ local function apply()
   local result = vim.deepcopy(state.current)
   -- Include alpha in the result
   result.alpha = state.alpha_enabled and state.alpha or nil
+  -- Include custom control values if any
+  if state.options.custom_controls and #state.options.custom_controls > 0 then
+    result.custom = vim.deepcopy(state.custom_values)
+  end
   local on_select = state.options.on_select
 
   -- Close picker FIRST so original buffer is current when callback runs
@@ -1162,15 +1167,6 @@ local function get_controls_definition()
       keys = {
         { key = "m", desc = "Cycle mode (HSL/RGB/CMYK/HSV)" },
         { key = "f", desc = "Toggle format (standard/decimal)" },
-      }
-    },
-    {
-      header = "Styles",
-      keys = {
-        { key = "b", desc = "Toggle bold" },
-        { key = "i", desc = "Toggle italic" },
-        { key = "B", desc = "Switch to edit background" },
-        { key = "x", desc = "Clear background color" },
       }
     },
     {
@@ -1303,9 +1299,6 @@ local function setup_multipanel_keymaps(multi)
 
   local common_keymaps = {}
 
-  common_keymaps[get_key("toggle_bg", "B")] = toggle_bg_mode
-  common_keymaps[get_key("clear_bg", "x")] = clear_bg
-
   common_keymaps[get_key("reset", "r")] = reset_color
   common_keymaps[get_key("hex_input", "#")] = enter_hex_input
   common_keymaps[get_key("apply", "<CR>")] = apply
@@ -1338,6 +1331,17 @@ local function setup_multipanel_keymaps(multi)
   end
   common_keymaps[get_key("focus_prev", "<S-Tab>")] = function()
     multi:focus_prev_panel()
+  end
+
+  -- Add keymaps for custom controls with key bindings
+  if state and state.options.custom_controls then
+    for _, control in ipairs(state.options.custom_controls) do
+      if control.key then
+        common_keymaps[control.key] = function()
+          toggle_custom_control(control.id)
+        end
+      end
+    end
   end
 
   multi:set_keymaps(common_keymaps)
@@ -1538,18 +1542,15 @@ function ColorPicker.show_multipanel(options)
   end
 
   local initial = vim.deepcopy(options.initial)
-  if initial.fg then
-    initial.fg = ColorUtils.normalize_hex(initial.fg)
+  if initial.color then
+    initial.color = ColorUtils.normalize_hex(initial.color)
   else
-    initial.fg = "#808080"
-  end
-  if initial.bg then
-    initial.bg = ColorUtils.normalize_hex(initial.bg)
+    initial.color = "#808080"
   end
 
   local initial_hsl = nil
-  if initial.fg then
-    local h, s, _ = ColorUtils.hex_to_hsl(initial.fg)
+  if initial.color then
+    local h, s, _ = ColorUtils.hex_to_hsl(initial.color)
     initial_hsl = { h = h, s = s }
   end
 
@@ -1625,7 +1626,6 @@ function ColorPicker.show_multipanel(options)
   state = {
     current = vim.deepcopy(initial),
     original = vim.deepcopy(initial),
-    editing_bg = false,
     grid_width = grid_width,
     grid_height = grid_height,
     win = grid_win,
@@ -1645,7 +1645,15 @@ function ColorPicker.show_multipanel(options)
     focused_panel = "grid",
     _render_pending = false,
     _keymaps = resolved_keymaps,
+    custom_values = {},
   }
+
+  -- Initialize custom control values from defaults
+  if options.custom_controls then
+    for _, control in ipairs(options.custom_controls) do
+      state.custom_values[control.id] = control.default
+    end
+  end
 
   setup_multipanel_keymaps(multi)
   render_multipanel()
@@ -1657,14 +1665,14 @@ end
 function ColorPicker.pick(opts)
   opts = opts or {}
 
-  -- Convert simple color string to ColorPickerColor format
+  -- Convert simple color string to NvimColorPickerColor format
   local initial
   if opts.color and type(opts.color) == "string" then
-    initial = { fg = opts.color }
+    initial = { color = opts.color }
   elseif opts.initial then
     initial = opts.initial
   else
-    initial = { fg = "#808080" }
+    initial = { color = "#808080" }
   end
 
   ColorPicker.show_multipanel({
@@ -1677,6 +1685,7 @@ function ColorPicker.pick(opts)
     alpha_enabled = opts.alpha_enabled,
     initial_alpha = opts.initial_alpha,
     keymaps = opts.keymaps,
+    custom_controls = opts.custom_controls,
   })
 end
 
