@@ -69,7 +69,7 @@ function M.create_layout_config()
             ratio = 0.30,
             min_height = INFO_PANEL_MIN_HEIGHT,
             focusable = true,
-            cursorline = false,
+            cursorline = true,
             filetype = "nvim-colorpicker-info",
           },
         }
@@ -97,7 +97,7 @@ function M.create_layout_config()
             ratio = 0.40,
             min_width = INFO_PANEL_MIN_WIDTH,
             focusable = true,
-            cursorline = false,
+            cursorline = true,
             filetype = "nvim-colorpicker-info",
           },
         }

@@ -88,8 +88,8 @@ schedule_render_multipanel = function()
   state._render_pending = true
   vim.schedule(function()
     if State.state and State.state._multipanel then
-      State.state._render_pending = false
       render_multipanel()
+      State.state._render_pending = false
     end
   end)
 end

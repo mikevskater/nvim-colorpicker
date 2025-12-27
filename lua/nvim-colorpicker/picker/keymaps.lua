@@ -281,7 +281,7 @@ function M.setup_history_keymaps(multi, schedule_render)
     history_cursor_autocmd = vim.api.nvim_create_autocmd("CursorMoved", {
       buffer = info_buf,
       callback = function()
-        HistoryTab.on_cursor_moved(schedule_render)
+        HistoryTab.on_cursor_moved()
       end,
     })
   end
@@ -356,7 +356,7 @@ function M.setup_presets_keymaps(multi, schedule_render)
     presets_cursor_autocmd = vim.api.nvim_create_autocmd("CursorMoved", {
       buffer = info_buf,
       callback = function()
-        PresetsTab.on_cursor_moved(schedule_render)
+        PresetsTab.on_cursor_moved()
       end,
     })
   end

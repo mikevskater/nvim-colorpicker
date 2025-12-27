@@ -148,8 +148,8 @@ local function get_header_offset()
 end
 
 ---Handle CursorMoved event - sync presets_cursor from buffer cursor
----@param schedule_render fun() Function to trigger re-render
-function M.on_cursor_moved(schedule_render)
+---No re-render needed - cursor position IS the selection indicator
+function M.on_cursor_moved()
   local state = State.state
   if not state then return end
 
@@ -170,10 +170,9 @@ function M.on_cursor_moved(schedule_render)
     item_idx = #items
   end
 
-  -- Only update and re-render if selection changed
-  if state.presets_cursor ~= item_idx and #items > 0 then
+  -- Just update state - no re-render (cursor is the visual indicator)
+  if #items > 0 then
     state.presets_cursor = item_idx
-    schedule_render()
   end
 end
 
@@ -320,33 +319,28 @@ function M.render_presets_content(cb)
       end
     end
 
-    -- Render all items - nvim-float handles scrolling
-    for i, item in ipairs(items) do
-      local is_selected = i == state.presets_cursor
-      local prefix_char = is_selected and ">" or " "
+    -- Render all items - cursor position is the selection indicator
+    for _, item in ipairs(items) do
       local indent = string.rep("  ", item.indent)
 
       if item.type == "preset" then
         local expand_char = item.expanded and "v" or ">"
-        local style = is_selected and "emphasis" or "header"
-        cb:styled(string.format(" %s%s%s %s (%d)",
-          prefix_char, indent, expand_char, item.preset_name, item.count), style)
+        cb:styled(string.format("  %s%s %s (%d)",
+          indent, expand_char, item.preset_name, item.count), "header")
 
       elseif item.type == "group" then
         local expand_char = item.expanded and "v" or ">"
-        local style = is_selected and "emphasis" or "value"
-        cb:styled(string.format(" %s%s%s %s (%d)",
-          prefix_char, indent, expand_char, item.group_name, item.count), style)
+        cb:styled(string.format("  %s%s %s (%d)",
+          indent, expand_char, item.group_name, item.count), "value")
 
       elseif item.type == "color" then
-        local style = is_selected and "emphasis" or "normal"
         local swatch_hl = get_swatch_highlight(item.hex)
         -- Pad color name to align swatches
         local padded_name = item.color_name .. string.rep(" ", max_name_len - #item.color_name)
 
         cb:spans({
-          { text = string.format(" %s%s", prefix_char, indent), style = style },
-          { text = padded_name, style = style },
+          { text = string.format("  %s", indent), style = "normal" },
+          { text = padded_name, style = "normal" },
           { text = " ", style = "normal" },
           { text = "  ", hl_group = swatch_hl },
         })

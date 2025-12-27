@@ -53,8 +53,8 @@ local function get_header_offset()
 end
 
 ---Handle CursorMoved event - sync history_cursor from buffer cursor
----@param schedule_render fun() Function to trigger re-render
-function M.on_cursor_moved(schedule_render)
+---No re-render needed - cursor position IS the selection indicator
+function M.on_cursor_moved()
   local state = State.state
   if not state then return end
 
@@ -75,10 +75,9 @@ function M.on_cursor_moved(schedule_render)
     item_idx = #history
   end
 
-  -- Only update and re-render if selection changed
-  if state.history_cursor ~= item_idx and #history > 0 then
+  -- Just update state - no re-render (cursor is the visual indicator)
+  if #history > 0 then
     state.history_cursor = item_idx
-    schedule_render()
   end
 end
 
@@ -181,19 +180,16 @@ function M.render_history_content(cb)
     cb:styled(string.format("  Recent (%d)", #history), "header")
     cb:blank()
 
+    -- Render all items - cursor position is the selection indicator
     for i, hex in ipairs(history) do
-      local is_selected = i == state.history_cursor
-      local prefix = is_selected and " >" or "  "
-      local style = is_selected and "emphasis" or "value"
-
       -- Create swatch highlight group
       local swatch_hl = get_swatch_highlight(hex)
 
       -- Build the line using spans with inline swatch highlight
       cb:spans({
-        { text = prefix, style = style },
-        { text = string.format("%2d ", i), style = style },
-        { text = hex, style = style },
+        { text = "  ", style = "normal" },
+        { text = string.format("%2d ", i), style = "value" },
+        { text = hex, style = "value" },
         { text = " ", style = "normal" },
         { text = "     ", hl_group = swatch_hl },  -- 5 spaces with bg color
       })
