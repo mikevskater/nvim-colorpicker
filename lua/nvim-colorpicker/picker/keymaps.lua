@@ -51,9 +51,9 @@ function M.get_controls_definition()
     {
       header = "Tabs",
       keys = {
-        { key = "1", desc = "Info tab" },
-        { key = "2", desc = "History tab" },
-        { key = "3", desc = "Presets tab" },
+        { key = "Alt+1", desc = "Info tab" },
+        { key = "Alt+2", desc = "History tab" },
+        { key = "Alt+3", desc = "Presets tab" },
       }
     },
     {
@@ -219,14 +219,14 @@ function M.setup_multipanel_keymaps(multi, schedule_render, apply, cancel)
     end
   end
 
-  -- Tab switching keymaps
-  common_keymaps["1"] = function()
+  -- Tab switching keymaps (Alt+number to preserve count prefixes)
+  common_keymaps["<A-1>"] = function()
     Tabs.switch_tab("info", schedule_render)
   end
-  common_keymaps["2"] = function()
+  common_keymaps["<A-2>"] = function()
     Tabs.switch_tab("history", schedule_render)
   end
-  common_keymaps["3"] = function()
+  common_keymaps["<A-3>"] = function()
     Tabs.switch_tab("presets", schedule_render)
   end
 
