@@ -70,10 +70,8 @@ local InputManager = require('nvim-float.input_manager')
 -- Constants
 -- ============================================================================
 
-local PREVIEW_HEIGHT = 2    -- Rows for color preview
 local PREVIEW_BORDERS = 2   -- Top and bottom border lines around preview
-local FOOTER_LABEL_HEIGHT = 1  -- Just the labels row (Original │ Current)
-local PREVIEW_RATIO = 0.10     -- Preview blocks = 10% of grid height
+local PREVIEW_RATIO = 0.10  -- Preview section = 10% of available height
 local HEADER_HEIGHT = 3     -- Blank + title + blank
 local PADDING = 2           -- Left/right padding
 
@@ -185,20 +183,16 @@ end
 local function calculate_grid_size(win_width, win_height)
   local available_width = win_width - PADDING * 2
 
-  -- Calculate total space for grid + preview blocks
-  -- Fixed overhead: header, in-grid preview, footer label, borders
-  local fixed_overhead = HEADER_HEIGHT + (PREVIEW_HEIGHT + PREVIEW_BORDERS) + FOOTER_LABEL_HEIGHT + 1
+  -- Calculate total space for grid + preview
+  -- Fixed overhead: header + preview borders (top/bottom lines)
+  local fixed_overhead = HEADER_HEIGHT + PREVIEW_BORDERS
   local total_flexible = win_height - fixed_overhead
 
   -- Allocate space: grid gets (1 - ratio), preview gets ratio
   -- total_flexible = grid_height + preview_rows
-  -- preview_rows = PREVIEW_RATIO * grid_height
-  -- So: total_flexible = grid_height * (1 + PREVIEW_RATIO)
-  local grid_height = math.floor(total_flexible / (1 + PREVIEW_RATIO))
-  local preview_rows = math.max(1, math.floor(grid_height * PREVIEW_RATIO))
-
-  -- Recalculate grid height after allocating preview rows
-  grid_height = total_flexible - preview_rows
+  -- preview_rows = PREVIEW_RATIO * total_flexible
+  local preview_rows = math.max(1, math.floor(total_flexible * PREVIEW_RATIO))
+  local grid_height = total_flexible - preview_rows
 
   if available_width % 2 == 0 then available_width = available_width - 1 end
   if grid_height % 2 == 0 then grid_height = grid_height - 1 end
@@ -343,7 +337,7 @@ local function render_grid()
   return lines, highlights
 end
 
----Render the preview section with alpha visualization
+---Render the split Original/Current preview section
 ---@return string[] lines
 ---@return table[] highlights
 local function render_preview()
@@ -353,32 +347,76 @@ local function render_preview()
   local highlights = {}
   local pad = string.rep(" ", PADDING)
 
-  local preview_color = get_active_color()
-  local alpha = state.alpha or 100
-
-  local alpha_char = get_alpha_char(alpha)
-  local alpha_char_len = #alpha_char
-
-  vim.api.nvim_set_hl(0, "NvimColorPickerPreview", { fg = preview_color })
-
-  local border_char = "─"
   local preview_width = state.grid_width
-  table.insert(lines, pad .. string.rep(border_char, preview_width))
+  local half_width = math.floor((preview_width - 1) / 2)  -- -1 for center divider
 
-  local preview_byte_len = preview_width * alpha_char_len
+  -- Get colors and alpha chars
+  local orig_color = state.original.color or "#808080"
+  local curr_color = state.current.color or "#808080"
+  local curr_alpha = state.alpha or 100
 
-  for i = 1, PREVIEW_HEIGHT do
-    local preview_line = pad .. string.rep(alpha_char, preview_width)
+  local orig_char = "█"  -- Original always solid
+  local curr_char = get_alpha_char(curr_alpha)
+
+  -- Set up highlight groups
+  vim.api.nvim_set_hl(0, "NvimColorPickerOriginalPreview", { fg = orig_color })
+  vim.api.nvim_set_hl(0, "NvimColorPickerCurrentPreview", { fg = curr_color })
+
+  -- Build top border with labels: "---Original-------Current---"
+  local border_char = "─"
+  local orig_label = "Original"
+  local curr_label = "Current"
+
+  -- Calculate label positions in the border
+  local orig_label_pos = math.floor((half_width - #orig_label) / 2)
+  local curr_label_pos = math.floor((half_width - #curr_label) / 2)
+
+  local top_border_left = string.rep(border_char, orig_label_pos) .. orig_label ..
+                          string.rep(border_char, half_width - orig_label_pos - #orig_label)
+  local top_border_right = string.rep(border_char, curr_label_pos) .. curr_label ..
+                           string.rep(border_char, half_width - curr_label_pos - #curr_label)
+  local top_border = pad .. top_border_left .. "┬" .. top_border_right
+
+  -- Pad or trim to exact width
+  local top_visual_len = half_width * 2 + 1
+  local current_len = #top_border_left + 1 + #top_border_right
+  if current_len < preview_width then
+    top_border = top_border .. string.rep(border_char, preview_width - current_len)
+  end
+
+  table.insert(lines, pad .. top_border_left .. "┬" .. top_border_right)
+
+  -- Build preview rows: "███████████████│████████████████"
+  local orig_block = string.rep(orig_char, half_width)
+  local curr_block = string.rep(curr_char, half_width)
+  local orig_block_bytes = half_width * #orig_char
+  local curr_block_bytes = half_width * #curr_char
+
+  local preview_rows = state.preview_rows or 2
+  for i = 1, preview_rows do
+    local preview_line = pad .. orig_block .. "│" .. curr_block
     table.insert(lines, preview_line)
+
+    -- Highlight original side
     table.insert(highlights, {
       line = #lines - 1,
       col_start = PADDING,
-      col_end = PADDING + preview_byte_len,
-      hl_group = "NvimColorPickerPreview",
+      col_end = PADDING + orig_block_bytes,
+      hl_group = "NvimColorPickerOriginalPreview",
+    })
+
+    -- Highlight current side (after divider)
+    local divider_bytes = 3  -- │ is 3 bytes in UTF-8
+    table.insert(highlights, {
+      line = #lines - 1,
+      col_start = PADDING + orig_block_bytes + divider_bytes,
+      col_end = PADDING + orig_block_bytes + divider_bytes + curr_block_bytes,
+      hl_group = "NvimColorPickerCurrentPreview",
     })
   end
 
-  table.insert(lines, pad .. string.rep(border_char, preview_width))
+  -- Bottom border
+  table.insert(lines, pad .. string.rep(border_char, half_width) .. "┴" .. string.rep(border_char, half_width))
 
   return lines, highlights
 end
@@ -399,111 +437,11 @@ local function render_header_cb()
   return cb
 end
 
----Render footer using ContentBuilder (split color preview box)
----@return ContentBuilder cb The content builder with footer content
----@return table swatch_info Info needed for applying color swatch highlights
+---Render footer (empty - preview is now integrated into the grid)
+---@return ContentBuilder cb Empty content builder
+---@return table swatch_info Empty (no longer used)
 local function render_footer_cb()
-  local cb = ContentBuilder.new()
-
-  if not state then return cb, {} end
-
-  local preview_rows = state.preview_rows or 1
-
-  -- Header row with labels
-  cb:spans({
-    { text = "   Original", style = "muted" },
-    { text = " │ ", style = "muted" },
-    { text = "Current", style = "muted" },
-  })
-
-  -- Split color preview box - left half original, right half current
-  -- Using alpha-aware block characters for visualization
-  -- Dynamic height based on preview_rows
-  local half_width = 8
-
-  -- Original always uses solid block (it's the reference)
-  local orig_char = "█"
-  -- Current uses alpha-aware character
-  local curr_alpha = state.alpha or 100
-  local curr_char = get_alpha_char(curr_alpha)
-
-  local orig_block = string.rep(orig_char, half_width)
-  local curr_block = string.rep(curr_char, half_width)
-
-  -- Calculate byte lengths (UTF-8 chars can be 1-3 bytes)
-  local orig_char_bytes = #orig_char
-  local curr_char_bytes = #curr_char
-
-  -- Render multiple rows of color blocks
-  for _ = 1, preview_rows do
-    cb:spans({
-      { text = "   " .. orig_block, style = "original_preview" },
-      { text = " ", style = "muted" },
-      { text = curr_block, style = "current_preview" },
-    })
-  end
-
-  -- Calculate byte positions for highlights (same for all rows)
-  -- Layout: "   ████████ ▓▓▓▓▓▓▓▓"
-  --          ^^^         ^
-  --          3 spaces    1 space separator
-  local orig_byte_start = 3
-  local orig_byte_end = 3 + (half_width * orig_char_bytes)
-  local curr_byte_start = orig_byte_end + 1  -- +1 for space separator
-  local curr_byte_end = curr_byte_start + (half_width * curr_char_bytes)
-
-  -- Return highlight info for all preview rows (starting after label row)
-  local swatch_info = {
-    original = { col_start = orig_byte_start, col_end = orig_byte_end },
-    current = { col_start = curr_byte_start, col_end = curr_byte_end },
-    row_count = preview_rows,
-  }
-
-  return cb, swatch_info
-end
-
----Apply color swatch highlights to the split preview blocks
----@param base_line number Line offset in buffer where footer starts
----@param swatch_info table Info from render_footer_cb
-local function apply_swatch_highlights(base_line, swatch_info)
-  if not state then return end
-
-  local orig_hl_name = "NvimColorPickerOriginalPreview"
-  local curr_hl_name = "NvimColorPickerCurrentPreview"
-
-  -- Set highlight colors for the block characters
-  local orig_color = state.original.color or "#808080"
-  local curr_color = state.current.color or "#808080"
-
-  vim.api.nvim_set_hl(0, orig_hl_name, { fg = orig_color })
-  vim.api.nvim_set_hl(0, curr_hl_name, { fg = curr_color })
-
-  local orig_info = swatch_info.original
-  local curr_info = swatch_info.current
-  local row_count = swatch_info.row_count or 1
-
-  -- Apply highlights to all preview rows (starting after label row at offset 1)
-  for row = 1, row_count do
-    local line_num = base_line + row  -- +1 for label row, but row starts at 1
-
-    vim.api.nvim_buf_add_highlight(
-      state.buf,
-      state.ns,
-      orig_hl_name,
-      line_num,
-      orig_info.col_start,
-      orig_info.col_end
-    )
-
-    vim.api.nvim_buf_add_highlight(
-      state.buf,
-      state.ns,
-      curr_hl_name,
-      line_num,
-      curr_info.col_start,
-      curr_info.col_end
-    )
-  end
+  return ContentBuilder.new(), {}
 end
 
 -- ============================================================================
@@ -518,9 +456,9 @@ local function create_layout_config()
   local ui = vim.api.nvim_list_uis()[1]
   local is_narrow = ui.width < MIN_SIDE_BY_SIDE_WIDTH
 
-  -- Minimum height: header + min grid rows + preview + min footer (label + 1 row blocks)
-  local min_footer_height = FOOTER_LABEL_HEIGHT + 1  -- Label row + minimum 1 preview row
-  local grid_content_height = HEADER_HEIGHT + 11 + 1 + (PREVIEW_HEIGHT + PREVIEW_BORDERS) + min_footer_height
+  -- Minimum height: header + min grid rows (11) + preview section (borders + 1 row)
+  local min_preview_height = PREVIEW_BORDERS + 1
+  local grid_content_height = HEADER_HEIGHT + 11 + min_preview_height
 
   if is_narrow then
     return {
@@ -670,29 +608,7 @@ local function render_grid_panel(multi_state)
     })
   end
 
-  state._swatch_info = swatch_info
-  state._footer_start_line = footer_start_line
-
   return all_lines, all_highlights
-end
-
----Apply grid panel post-render highlights
----@param multi_state MultiPanelState
-local function apply_grid_panel_highlights(multi_state)
-  if not state or not state._swatch_info then return end
-
-  local panel = multi_state.panels["grid"]
-  if not panel or not panel.float or not panel.float:is_valid() then return end
-
-  local original_buf = state.buf
-  local original_ns = state.ns
-  state.buf = panel.float.bufnr
-  state.ns = panel.namespace
-
-  apply_swatch_highlights(state._footer_start_line, state._swatch_info)
-
-  state.buf = original_buf
-  state.ns = original_ns
 end
 
 ---Render the info panel content using ContentBuilder with interactive inputs
@@ -912,7 +828,6 @@ local function render_multipanel()
   local multi = state._multipanel
 
   multi:render_panel("grid")
-  apply_grid_panel_highlights(multi)
   multi:render_panel("info")
 
   if state._info_input_manager and state._info_panel_cb then
