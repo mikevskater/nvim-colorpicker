@@ -1219,6 +1219,9 @@ function ColorPicker.close()
 
   state = nil
 
+  -- Clean up focus loss autocmds
+  pcall(vim.api.nvim_del_augroup_by_name, "NvimColorPickerFocusLoss")
+
   for row = 1, grid_height do
     for col = 1, grid_width do
       pcall(vim.api.nvim_set_hl, 0, get_cell_hl_group(row, col), {})
@@ -1654,6 +1657,51 @@ function ColorPicker.show_multipanel(options)
   setup_multipanel_keymaps(multi)
   render_multipanel()
   setup_info_panel_input_manager(multi)
+
+  -- Set up autocmd to cancel on focus loss
+  local augroup = vim.api.nvim_create_augroup("NvimColorPickerFocusLoss", { clear = true })
+
+  local function on_focus_lost()
+    -- Only cancel if we're still open and leaving to a non-picker window
+    if not state then return end
+
+    -- Schedule to run after the window switch completes
+    vim.schedule(function()
+      if not state then return end
+
+      local current_win = vim.api.nvim_get_current_win()
+      local grid_panel = state._multipanel and state._multipanel.panels["grid"]
+      local info_panel = state._multipanel and state._multipanel.panels["info"]
+
+      local grid_win = grid_panel and grid_panel.float and grid_panel.float.winid
+      local info_win = info_panel and info_panel.float and info_panel.float.winid
+
+      -- If current window is not one of our panels, cancel
+      if current_win ~= grid_win and current_win ~= info_win then
+        cancel()
+      end
+    end)
+  end
+
+  -- Add WinLeave autocmd for both panels
+  local grid_panel = multi.panels["grid"]
+  local info_panel = multi.panels["info"]
+
+  if grid_panel and grid_panel.float and grid_panel.float.winid then
+    vim.api.nvim_create_autocmd("WinLeave", {
+      group = augroup,
+      buffer = grid_panel.float.bufnr,
+      callback = on_focus_lost,
+    })
+  end
+
+  if info_panel and info_panel.float and info_panel.float.winid then
+    vim.api.nvim_create_autocmd("WinLeave", {
+      group = augroup,
+      buffer = info_panel.float.bufnr,
+      callback = on_focus_lost,
+    })
+  end
 end
 
 ---Open color picker (wrapper for pick API)
