@@ -183,8 +183,8 @@ end
 local function calculate_grid_size(win_width, win_height)
   local available_width = win_width - PADDING * 2
 
-  -- Fixed overhead: header (3 lines) + preview borders (2 lines for top/bottom)
-  local fixed_overhead = HEADER_HEIGHT + PREVIEW_BORDERS
+  -- Fixed overhead: header (3 lines) + preview borders (2 lines for top/bottom) + 1 for window border
+  local fixed_overhead = HEADER_HEIGHT + PREVIEW_BORDERS + 1
   local total_flexible = math.max(0, win_height - fixed_overhead)
 
   -- Allocate space: preview gets ratio, grid gets the rest
