@@ -1100,6 +1100,8 @@ local function apply()
   if not state then return end
 
   local result = vim.deepcopy(state.current)
+  -- Include alpha in the result
+  result.alpha = state.alpha_enabled and state.alpha or nil
   local on_select = state.options.on_select
 
   -- Close picker FIRST so original buffer is current when callback runs

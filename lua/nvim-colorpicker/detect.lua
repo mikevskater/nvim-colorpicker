@@ -25,12 +25,41 @@ local PATTERNS = {
 }
 
 ---@class NvimColorPickerColorInfo
----@field color string The parsed hex color
+---@field color string The parsed hex color (without alpha)
 ---@field start_col number Start column (0-indexed)
 ---@field end_col number End column (0-indexed)
 ---@field format string Original format type
 ---@field original string Original matched string
 ---@field line number Line number (1-indexed)
+---@field alpha number? Alpha value 0-100 (nil means opaque/100)
+
+---Extract alpha value from a color string
+---@param matched string The matched color string
+---@param format string The format type
+---@return number? alpha Alpha value 0-100, or nil if no alpha
+local function extract_alpha(matched, format)
+  if format == "hex8" then
+    -- #RRGGBBAA - last two chars are alpha (00-FF -> 0-100)
+    local alpha_hex = matched:sub(8, 9)
+    local alpha_int = tonumber(alpha_hex, 16)
+    if alpha_int then
+      return math.floor((alpha_int / 255) * 100 + 0.5)
+    end
+  elseif format == "rgb" then
+    -- rgba(r, g, b, a) - alpha is 0-1 decimal
+    local alpha = matched:match("rgba%s*%([^,]+,[^,]+,[^,]+[,/]%s*([%d%.]+)%s*%)")
+    if alpha then
+      return math.floor(tonumber(alpha) * 100 + 0.5)
+    end
+  elseif format == "hsl" then
+    -- hsla(h, s%, l%, a) - alpha is 0-1 decimal
+    local alpha = matched:match("hsla%s*%([^,]+,[^,]+,[^,]+[,/]%s*([%d%.]+)%s*%)")
+    if alpha then
+      return math.floor(tonumber(alpha) * 100 + 0.5)
+    end
+  end
+  return nil
+end
 
 ---Get color at cursor position
 ---@return NvimColorPickerColorInfo? color_info Color info or nil if no color found
@@ -63,6 +92,7 @@ function M.get_color_at_cursor()
             format = pat_info.format,
             original = matched,
             line = row,
+            alpha = extract_alpha(matched, pat_info.format),
           }
         end
       end
@@ -166,18 +196,39 @@ end
 ---Format hex color to target format
 ---@param hex string Hex color
 ---@param format string Target format
+---@param alpha number? Alpha value 0-100 (nil or 100 means opaque)
 ---@return string formatted Formatted color string
-function M.format_color(hex, format)
-  if format == "hex" or format == "hex3" or format == "hex8" then
+function M.format_color(hex, format, alpha)
+  local has_alpha = alpha and alpha < 100
+
+  if format == "hex8" then
+    -- Always output with alpha for hex8 format
+    local alpha_val = alpha or 100
+    local alpha_hex = string.format("%02X", math.floor((alpha_val / 100) * 255 + 0.5))
+    return hex .. alpha_hex
+  elseif format == "hex" or format == "hex3" then
+    -- For hex/hex3, only add alpha if present and not fully opaque
+    if has_alpha then
+      local alpha_hex = string.format("%02X", math.floor((alpha / 100) * 255 + 0.5))
+      return hex .. alpha_hex
+    end
     return hex
   elseif format == "rgb" then
     local r, g, b = utils.hex_to_rgb(hex)
+    if has_alpha then
+      return string.format("rgba(%d, %d, %d, %.2f)",
+        math.floor(r + 0.5), math.floor(g + 0.5), math.floor(b + 0.5), alpha / 100)
+    end
     return string.format("rgb(%d, %d, %d)", math.floor(r + 0.5), math.floor(g + 0.5), math.floor(b + 0.5))
   elseif format == "hsl" then
     local h, s, l = utils.hex_to_hsl(hex)
+    if has_alpha then
+      return string.format("hsla(%d, %d%%, %d%%, %.2f)",
+        math.floor(h + 0.5), math.floor(s + 0.5), math.floor(l + 0.5), alpha / 100)
+    end
     return string.format("hsl(%d, %d%%, %d%%)", math.floor(h + 0.5), math.floor(s + 0.5), math.floor(l + 0.5))
   elseif format == "vim" then
-    -- Preserve guifg= or guibg= prefix
+    -- Preserve guifg= or guibg= prefix (vim doesn't support alpha)
     return hex
   end
 
@@ -187,17 +238,18 @@ end
 ---Replace color at cursor with new color
 ---@param new_color string New hex color
 ---@param color_info NvimColorPickerColorInfo Original color info from get_color_at_cursor
-function M.replace_color_at_cursor(new_color, color_info)
+---@param alpha number? Alpha value 0-100 (nil means use original or 100)
+function M.replace_color_at_cursor(new_color, color_info, alpha)
   if not color_info then return end
 
   -- Format the new color to match original format
   local formatted
   if color_info.format == "vim" then
-    -- Preserve guifg= or guibg= prefix
+    -- Preserve guifg= or guibg= prefix (vim doesn't support alpha)
     local prefix = color_info.original:match("^(gui[fb]g=)")
     formatted = (prefix or "") .. new_color
   else
-    formatted = M.format_color(new_color, color_info.format)
+    formatted = M.format_color(new_color, color_info.format, alpha)
   end
 
   -- Get the line and replace

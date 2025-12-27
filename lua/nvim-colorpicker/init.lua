@@ -108,10 +108,12 @@ function M.pick_at_cursor()
 
   M.pick({
     color = color_info.color,
+    alpha_enabled = true,  -- Always allow alpha editing
+    initial_alpha = color_info.alpha or 100,  -- Use detected alpha or default to 100
     on_select = function(result)
-      -- result is {fg, bg, bold, italic} - extract the appropriate color
+      -- result is {fg, bg, bold, italic, alpha} - extract the appropriate color
       local new_color = result.fg or result.bg or color_info.color
-      detect.replace_color_at_cursor(new_color, color_info)
+      detect.replace_color_at_cursor(new_color, color_info, result.alpha)
     end,
   })
 end
