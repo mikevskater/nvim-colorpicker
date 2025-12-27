@@ -46,8 +46,17 @@ local function render_multipanel()
     -- Setup or update InputManager for info tab
     if state._info_input_manager and state._info_panel_cb then
       local cb = state._info_panel_cb
+      -- Tab bar adds 2 lines at the top - offset input positions
+      local TAB_BAR_HEIGHT = 2
+      local raw_inputs = cb:get_inputs()
+      local offset_inputs = {}
+      for key, input in pairs(raw_inputs) do
+        offset_inputs[key] = vim.tbl_extend("force", input, {
+          line = input.line + TAB_BAR_HEIGHT,
+        })
+      end
       state._info_input_manager:update_inputs(
-        cb:get_inputs(),
+        offset_inputs,
         cb:get_input_order()
       )
       InfoPanel.update_input_validation_settings()
@@ -58,12 +67,27 @@ local function render_multipanel()
     -- Clear tab-specific keymaps when on info tab
     Keymaps.clear_history_keymaps(multi)
   elseif active_tab == "history" then
+    -- Destroy InputManager when leaving info tab (removes j/k keymaps)
+    if state._info_input_manager then
+      state._info_input_manager:destroy()
+      state._info_input_manager = nil
+    end
     -- Setup history keymaps
     Keymaps.setup_history_keymaps(multi, schedule_render)
   elseif active_tab == "presets" then
+    -- Destroy InputManager when leaving info tab (removes j/k keymaps)
+    if state._info_input_manager then
+      state._info_input_manager:destroy()
+      state._info_input_manager = nil
+    end
     -- Setup presets keymaps
     Keymaps.setup_presets_keymaps(multi, schedule_render)
   else
+    -- Destroy InputManager for unknown tabs
+    if state._info_input_manager then
+      state._info_input_manager:destroy()
+      state._info_input_manager = nil
+    end
     -- Clear tab-specific keymaps for unknown tabs
     Keymaps.clear_history_keymaps(multi)
   end

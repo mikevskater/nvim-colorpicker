@@ -437,10 +437,20 @@ function M.setup_info_panel_input_manager(multi, schedule_render)
   local winid = info_panel.float.winid
   local cb = state._info_panel_cb
 
+  -- Tab bar adds 2 lines at the top - offset input positions
+  local TAB_BAR_HEIGHT = 2
+  local raw_inputs = cb:get_inputs()
+  local offset_inputs = {}
+  for key, input in pairs(raw_inputs) do
+    offset_inputs[key] = vim.tbl_extend("force", input, {
+      line = input.line + TAB_BAR_HEIGHT,
+    })
+  end
+
   state._info_input_manager = InputManager.new({
     bufnr = bufnr,
     winid = winid,
-    inputs = cb:get_inputs(),
+    inputs = offset_inputs,
     input_order = cb:get_input_order(),
     on_input_exit = function(key)
       local value = state._info_input_manager:get_validated_value(key)
