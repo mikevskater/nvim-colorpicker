@@ -50,7 +50,12 @@ M.defaults = {
   highlight = {
     enable = false,  -- Set to true to enable auto-highlighting
     filetypes = '*', -- '*' for all filetypes, or list like {'css', 'html', 'lua'}
-    exclude_filetypes = { 'lazy', 'mason', 'help', 'TelescopePrompt' },
+    exclude_filetypes = {
+      'lazy', 'mason', 'help', 'TelescopePrompt',
+      -- Exclude nvim-float and nvim-colorpicker UI buffers
+      'nvim-float', 'nvim-float-form', 'nvim-float-interactive',
+      'nvim-colorpicker-grid', 'nvim-colorpicker-info',
+    },
     mode = 'background', -- 'background', 'foreground', or 'virtualtext'
     swatch_char = '■',   -- Character for virtualtext swatch (e.g., '●', '▓', '█', '◼')
   },

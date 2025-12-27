@@ -28,7 +28,7 @@
 local M = {}
 
 ---Plugin version
-M.version = '1.3.0'
+M.version = '1.4.0'
 
 -- Lazy-load modules
 local function get_config()
@@ -69,11 +69,28 @@ end
 
 ---@class NvimColorPickerPickOptions
 ---@field color string? Initial color (hex, rgb, or hsl string)
----@field on_select fun(color: string)? Called when user confirms selection
+---@field title string? Title for the picker window
+---@field on_select fun(result: table)? Called when user confirms (result: {color, alpha?, custom?})
 ---@field on_cancel fun()? Called when user cancels
----@field on_change fun(color: string)? Called on every color change
+---@field on_change fun(result: table)? Called on every color change (result: {color, alpha?, custom?})
 ---@field keymaps table? Override keymaps for this picker instance
 ---@field alpha_enabled boolean? Enable alpha editing
+---@field initial_alpha number? Initial alpha value (0-100)
+---@field forced_mode "hsl"|"rgb"|"cmyk"|"hsv"? Force specific color mode
+---@field custom_controls NvimColorPickerCustomControl[]? Injectable custom controls (toggle/select/number/text)
+
+---Custom control definition for injectable UI elements
+---@class NvimColorPickerCustomControl
+---@field id string Unique identifier for this control
+---@field type "toggle"|"select"|"number"|"text" Control type
+---@field label string Display label
+---@field default any Default value
+---@field key string? Optional keymap to toggle/cycle this control
+---@field options string[]? Options for select type
+---@field min number? Minimum for number type
+---@field max number? Maximum for number type
+---@field step number? Step for number type
+---@field on_change fun(new_value: any, old_value: any, control_id: string)? Callback when value changes
 
 ---Open color picker
 ---@param opts NvimColorPickerPickOptions? Options for the picker
@@ -146,6 +163,28 @@ end
 ---@return table Color utilities (hex_to_rgb, rgb_to_hex, etc.)
 function M.utils()
   return get_utils()
+end
+
+-- ============================================================================
+-- Picker Manipulation
+-- ============================================================================
+
+---Set the current color in an open picker (for external updates like fg/bg switching)
+---@param hex string The new hex color
+function M.set_color(hex)
+  get_picker().set_color(hex)
+end
+
+---Get the current color from an open picker
+---@return string? hex The current hex color, or nil if picker not open
+function M.get_color()
+  return get_picker().get_color()
+end
+
+---Check if picker is currently open
+---@return boolean
+function M.is_open()
+  return get_picker().is_open()
 end
 
 -- ============================================================================
