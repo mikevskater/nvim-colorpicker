@@ -183,23 +183,40 @@ end
 local function calculate_grid_size(win_width, win_height)
   local available_width = win_width - PADDING * 2
 
-  -- Calculate total space for grid + preview
-  -- Fixed overhead: header + preview borders (top/bottom lines)
+  -- Fixed overhead: header (3 lines) + preview borders (2 lines for top/bottom)
   local fixed_overhead = HEADER_HEIGHT + PREVIEW_BORDERS
-  local total_flexible = win_height - fixed_overhead
+  local total_flexible = math.max(0, win_height - fixed_overhead)
 
-  -- Allocate space: grid gets (1 - ratio), preview gets ratio
-  -- total_flexible = grid_height + preview_rows
-  -- preview_rows = PREVIEW_RATIO * total_flexible
+  -- Allocate space: preview gets ratio, grid gets the rest
+  -- preview_rows = PREVIEW_RATIO * total_flexible (at least 1 row)
   local preview_rows = math.max(1, math.floor(total_flexible * PREVIEW_RATIO))
+
+  -- Grid gets remaining space
   local grid_height = total_flexible - preview_rows
 
-  if available_width % 2 == 0 then available_width = available_width - 1 end
-  if grid_height % 2 == 0 then grid_height = grid_height - 1 end
+  -- Apply odd-height preference for grid (better center alignment)
+  if grid_height % 2 == 0 and grid_height > 5 then
+    grid_height = grid_height - 1
+  end
 
+  -- Apply odd-width preference
+  if available_width % 2 == 0 then
+    available_width = available_width - 1
+  end
+
+  -- Enforce minimums
   available_width = math.max(11, available_width)
   grid_height = math.max(5, grid_height)
   preview_rows = math.max(1, preview_rows)
+
+  -- Final validation: ensure total content fits in window
+  -- Total = HEADER_HEIGHT + grid_height + PREVIEW_BORDERS + preview_rows
+  local total_content = HEADER_HEIGHT + grid_height + PREVIEW_BORDERS + preview_rows
+  if total_content > win_height then
+    -- Reduce grid height to fit
+    local excess = total_content - win_height
+    grid_height = math.max(5, grid_height - excess)
+  end
 
   return available_width, grid_height, preview_rows
 end
@@ -574,9 +591,7 @@ local function render_grid_panel(multi_state)
   end
   line_offset = #all_lines
 
-  table.insert(all_lines, "")
-  line_offset = #all_lines
-
+  -- Preview section (with labeled border, no extra blank line needed)
   local preview_lines, preview_highlights = render_preview()
   for _, line in ipairs(preview_lines) do
     table.insert(all_lines, line)
