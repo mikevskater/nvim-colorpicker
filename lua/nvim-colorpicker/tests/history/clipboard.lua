@@ -4,7 +4,7 @@ local framework = require('nvim-colorpicker.tests.framework')
 local describe, it, expect = framework.describe, framework.it, framework.expect
 
 local history = require('nvim-colorpicker.history')
-local utils = require('nvim-colorpicker.utils')
+local color = require('nvim-colorpicker.color')
 
 -- ============================================================================
 -- Yank Function

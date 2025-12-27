@@ -3,7 +3,7 @@
 local framework = require('nvim-colorpicker.tests.framework')
 local describe, it, expect = framework.describe, framework.it, framework.expect
 
-local utils = require('nvim-colorpicker.utils')
+local utils = require('nvim-colorpicker.color')
 
 -- ============================================================================
 -- Hex <-> RGB Conversions

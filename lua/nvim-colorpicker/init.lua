@@ -40,7 +40,7 @@ local function get_picker()
 end
 
 local function get_utils()
-  return require('nvim-colorpicker.utils')
+  return require('nvim-colorpicker.color')
 end
 
 local function get_detect()

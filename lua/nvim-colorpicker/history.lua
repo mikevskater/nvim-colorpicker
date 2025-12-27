@@ -3,7 +3,7 @@
 
 local M = {}
 
-local utils = require('nvim-colorpicker.utils')
+local utils = require('nvim-colorpicker.color')
 
 -- ============================================================================
 -- State

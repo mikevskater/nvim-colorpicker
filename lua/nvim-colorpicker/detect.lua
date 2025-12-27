@@ -5,7 +5,7 @@
 
 local M = {}
 
-local utils = require('nvim-colorpicker.utils')
+local utils = require('nvim-colorpicker.color')
 
 -- Color patterns to detect (order matters - more specific patterns first)
 local PATTERNS = {
