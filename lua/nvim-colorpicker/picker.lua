@@ -859,7 +859,14 @@ local function render_multipanel()
   end
 
   if state.options.on_change then
-    state.options.on_change(vim.deepcopy(state.current))
+    local result = vim.deepcopy(state.current)
+    -- Include alpha in the result
+    result.alpha = state.alpha_enabled and state.alpha or nil
+    -- Include custom control values if any
+    if state.options.custom_controls and #state.options.custom_controls > 0 then
+      result.custom = vim.deepcopy(state.custom_values)
+    end    
+    state.options.on_change(result)
   end
 end
 
