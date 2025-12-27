@@ -28,6 +28,7 @@ ColorPicker.Types = Types
 -- ============================================================================
 
 local schedule_render_multipanel
+local schedule_render  -- Forward declaration
 
 ---Render all multipanel panels
 local function render_multipanel()
@@ -91,7 +92,7 @@ schedule_render_multipanel = function()
 end
 
 ---Schedule a render for the next event loop iteration
-local function schedule_render()
+schedule_render = function()
   if not State.state then return end
   schedule_render_multipanel()
 end

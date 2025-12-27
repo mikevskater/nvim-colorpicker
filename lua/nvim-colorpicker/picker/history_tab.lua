@@ -153,13 +153,16 @@ end
 
 ---Render the history tab content (without tab bar)
 ---@param cb ContentBuilder The content builder to add content to
-function M.render_history_content(cb)
+---@param swatch_highlights table Table to collect swatch highlight definitions
+---@param line_offset number Starting line offset for highlights
+function M.render_history_content(cb, swatch_highlights, line_offset)
   local state = State.state
   if not state then return end
 
   local history = History.get_recent(MAX_DISPLAY_ITEMS)
 
   cb:blank()
+  local current_line = line_offset + 1
 
   if #history == 0 then
     cb:styled("  No recent colors", "muted")
@@ -169,6 +172,7 @@ function M.render_history_content(cb)
   else
     cb:styled(string.format("  Recent (%d)", #history), "header")
     cb:blank()
+    current_line = current_line + 2
 
     for i, hex in ipairs(history) do
       local is_selected = i == state.history_cursor
@@ -178,14 +182,23 @@ function M.render_history_content(cb)
       -- Create swatch highlight
       local swatch_hl = get_swatch_highlight(hex)
 
-      -- Build the line with swatch
-      cb:spans({
-        { text = prefix, style = style },
-        { text = string.format("%2d ", i), style = "muted" },
-        { text = hex, style = style },
-        { text = " ", style = "normal" },
-        { text = "████", hl_group = swatch_hl },
+      -- Build the line without swatch (we'll add highlight separately)
+      local line_text = string.format("%s%2d %s ████", prefix, i, hex)
+      cb:styled(line_text, style)
+
+      -- Calculate swatch position (after hex + space)
+      -- prefix(2) + index(3) + hex(7) + space(1) = 13 bytes
+      local swatch_start = #prefix + 3 + #hex + 1
+      local swatch_end = swatch_start + 12  -- 4 unicode blocks = 12 bytes
+
+      table.insert(swatch_highlights, {
+        line = current_line,
+        col_start = swatch_start,
+        col_end = swatch_end,
+        hl_group = swatch_hl,
       })
+
+      current_line = current_line + 1
     end
   end
 
@@ -229,7 +242,8 @@ function M.render_history_panel(multi_state)
 
   -- Add history content
   local cb = ContentBuilder.new()
-  M.render_history_content(cb)
+  local swatch_highlights = {}
+  M.render_history_content(cb, swatch_highlights, line_offset)
 
   local content_lines = cb:build_lines()
   local content_highlights = cb:build_highlights()
@@ -244,6 +258,11 @@ function M.render_history_panel(multi_state)
       col_end = hl.col_end,
       hl_group = hl.hl_group,
     })
+  end
+
+  -- Add swatch highlights (already have correct line numbers)
+  for _, hl in ipairs(swatch_highlights) do
+    table.insert(all_highlights, hl)
   end
 
   return all_lines, all_highlights
