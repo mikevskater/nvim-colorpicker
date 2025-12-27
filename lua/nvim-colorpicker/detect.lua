@@ -199,15 +199,11 @@ end
 ---@param alpha number? Alpha value 0-100 (nil or 100 means opaque)
 ---@return string formatted Formatted color string
 function M.format_color(hex, format, alpha)
+  -- Only include alpha in output when it's actually transparent (< 100)
   local has_alpha = alpha and alpha < 100
 
-  if format == "hex8" then
-    -- Always output with alpha for hex8 format
-    local alpha_val = alpha or 100
-    local alpha_hex = string.format("%02X", math.floor((alpha_val / 100) * 255 + 0.5))
-    return hex .. alpha_hex
-  elseif format == "hex" or format == "hex3" then
-    -- For hex/hex3, only add alpha if present and not fully opaque
+  if format == "hex8" or format == "hex" or format == "hex3" then
+    -- Only add alpha suffix if actually transparent
     if has_alpha then
       local alpha_hex = string.format("%02X", math.floor((alpha / 100) * 255 + 0.5))
       return hex .. alpha_hex
