@@ -21,10 +21,12 @@ local InputManager = require('nvim-float.input_manager')
 ---@field type "toggle"|"select"|"number"|"text" Control type
 ---@field label string Display label
 ---@field default any Default value
+---@field key string? Optional keymap to toggle/cycle this control
 ---@field options string[]? Options for select type
 ---@field min number? Minimum for number type
 ---@field max number? Maximum for number type
 ---@field step number? Step for number type
+---@field on_change fun(new_value: any, old_value: any, control_id: string)? Callback when value changes
 
 ---@class NvimColorPickerOptions
 ---@field initial NvimColorPickerColor Initial color value
@@ -1000,29 +1002,36 @@ local function toggle_custom_control(control_id)
 
   if not control then return end
 
-  local current = state.custom_values[control_id]
+  local old_value = state.custom_values[control_id]
+  local new_value = old_value
 
   if control.type == "toggle" then
-    state.custom_values[control_id] = not current
+    new_value = not old_value
   elseif control.type == "select" then
     -- Cycle through options
     local current_idx = 1
     for i, opt in ipairs(control.options) do
-      if opt == current then
+      if opt == old_value then
         current_idx = i
         break
       end
     end
     local next_idx = (current_idx % #control.options) + 1
-    state.custom_values[control_id] = control.options[next_idx]
+    new_value = control.options[next_idx]
   elseif control.type == "number" then
     -- Increment with step, wrap at max
     local step = control.step or 1
     local min_val = control.min or 0
     local max_val = control.max or 100
-    local new_val = current + step
-    if new_val > max_val then new_val = min_val end
-    state.custom_values[control_id] = new_val
+    new_value = old_value + step
+    if new_value > max_val then new_value = min_val end
+  end
+
+  state.custom_values[control_id] = new_value
+
+  -- Call on_change callback if provided
+  if control.on_change and old_value ~= new_value then
+    control.on_change(new_value, old_value, control_id)
   end
 
   schedule_render()
@@ -1743,6 +1752,32 @@ end
 ---@return NvimColorPickerState?
 function ColorPicker.get_state()
   return state
+end
+
+---Set the current color (for external updates, e.g., when switching fg/bg target)
+---@param hex string The new hex color
+function ColorPicker.set_color(hex)
+  if not state then return end
+
+  hex = ColorUtils.normalize_hex(hex)
+  state.current.color = hex
+
+  -- Update saved HSL for grid positioning
+  local h, s, _ = ColorUtils.hex_to_hsl(hex)
+  state.saved_hsl = { h = h, s = s }
+
+  -- Reset virtual positions
+  state.lightness_virtual = nil
+  state.saturation_virtual = nil
+
+  schedule_render()
+end
+
+---Get the current color
+---@return string? hex The current hex color
+function ColorPicker.get_color()
+  if not state then return nil end
+  return state.current.color
 end
 
 return ColorPicker
