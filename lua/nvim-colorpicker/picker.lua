@@ -16,9 +16,17 @@ local InputManager = require('nvim-float.input_manager')
 ---@class NvimColorPickerColor
 ---@field fg string? Foreground hex color
 ---@field bg string? Background hex color
----@field bold boolean?
----@field italic boolean?
 ---@field underline boolean?
+
+---@class NvimColorPickerCustomControl
+---@field id string Unique identifier for this control
+---@field type "toggle"|"select"|"number"|"text" Control type
+---@field label string Display label
+---@field default any Default value
+---@field options string[]? Options for select type
+---@field min number? Minimum for number type
+---@field max number? Maximum for number type
+---@field step number? Step for number type
 
 ---@class NvimColorPickerOptions
 ---@field initial NvimColorPickerColor Initial color value
@@ -30,6 +38,7 @@ local InputManager = require('nvim-float.input_manager')
 ---@field alpha_enabled boolean? Allow alpha editing (default: false)
 ---@field initial_alpha number? Initial alpha value 0-100 (default: 100)
 ---@field keymaps table? Custom keymaps (merged with defaults)
+---@field custom_controls NvimColorPickerCustomControl[]? Injectable custom controls
 
 ---@class NvimColorPickerState
 ---@field current NvimColorPickerColor Current working color
@@ -57,6 +66,7 @@ local InputManager = require('nvim-float.input_manager')
 ---@field _info_panel_cb table? ContentBuilder for info panel (stores inputs)
 ---@field _info_input_manager table? InputManager for info panel
 ---@field _keymaps table? Resolved keymaps
+---@field custom_values table<string, any> Current values for custom controls
 
 -- ============================================================================
 -- Constants
@@ -383,7 +393,7 @@ local function render_header_cb()
   return cb
 end
 
----Render footer using ContentBuilder
+---Render footer using ContentBuilder (minimal - just Original/Current swatches)
 ---@return ContentBuilder cb The content builder with footer content
 ---@return table swatch_info Info needed for applying color swatch highlights
 local function render_footer_cb()
@@ -391,36 +401,13 @@ local function render_footer_cb()
 
   if not state then return cb, {} end
 
-  local fg_bg_mode = state.editing_bg and "[bg]" or "[fg]"
-  local bold_indicator = state.current.bold and "[B]" or "[ ]"
-  local italic_indicator = state.current.italic and "[I]" or "[ ]"
-
   cb:blank()
 
+  -- Just show Original/Current color swatches - all other info is on info panel
   cb:spans({
     { text = "  Original", style = "label" },
     { text = "   ", style = "muted" },
     { text = "Current", style = "label" },
-    { text = "   " .. fg_bg_mode .. " ", style = "muted" },
-    { text = bold_indicator .. " bold ", style = state.current.bold and "emphasis" or "muted" },
-    { text = italic_indicator .. " italic", style = state.current.italic and "emphasis" or "muted" },
-  })
-
-  cb:blank()
-
-  local color_mode_display = state.color_mode:upper()
-  local alpha_display = state.alpha_enabled
-    and string.format("  A: %d%%", math.floor(state.alpha + 0.5))
-    or ""
-
-  cb:spans({
-    { text = "  Mode: ", style = "label" },
-    { text = color_mode_display, style = "value" },
-    { text = " (m)", style = "muted" },
-    { text = alpha_display, style = state.alpha < 100 and "emphasis" or "muted" },
-    { text = "  Step: ", style = "label" },
-    { text = get_step_label(), style = "value" },
-    { text = " (-/+)", style = "muted" },
   })
 
   local swatch_info = {
@@ -746,21 +733,54 @@ local function render_info_panel(multi_state)
 
   cb:blank()
 
-  local mode_ind = state.editing_bg and "[bg]" or "[fg]"
-  local bold_ind = state.current.bold and "[B]" or "[ ]"
-  local italic_ind = state.current.italic and "[I]" or "[ ]"
+  -- Step size control
+  cb:spans({
+    { text = "  Step: ", style = "label" },
+    { text = get_step_label(), style = "value" },
+    { text = "  -/+", style = "key" },
+  })
 
+  cb:blank()
+
+  -- fg/bg mode
+  local mode_ind = state.editing_bg and "[bg]" or "[fg]"
   cb:spans({
     { text = "  " .. mode_ind, style = "muted" },
+    { text = "  B", style = "key" },
   })
 
-  cb:spans({
-    { text = "  " .. bold_ind .. " bold", style = state.current.bold and "emphasis" or "muted" },
-  })
+  -- Render custom controls if any
+  if state.options.custom_controls and #state.options.custom_controls > 0 then
+    cb:blank()
+    cb:styled("  " .. string.rep("─", 16), "muted")
+    cb:blank()
+    cb:styled("  Options", "header")
 
-  cb:spans({
-    { text = "  " .. italic_ind .. " italic", style = state.current.italic and "emphasis" or "muted" },
-  })
+    for _, control in ipairs(state.options.custom_controls) do
+      local value = state.custom_values[control.id]
+      if control.type == "toggle" then
+        local indicator = value and "[x]" or "[ ]"
+        cb:spans({
+          { text = "  " .. indicator .. " " .. control.label, style = value and "emphasis" or "muted" },
+        })
+      elseif control.type == "select" then
+        cb:spans({
+          { text = "  " .. control.label .. ": ", style = "label" },
+          { text = tostring(value), style = "value" },
+        })
+      elseif control.type == "number" then
+        cb:spans({
+          { text = "  " .. control.label .. ": ", style = "label" },
+          { text = tostring(value), style = "value" },
+        })
+      elseif control.type == "text" then
+        cb:spans({
+          { text = "  " .. control.label .. ": ", style = "label" },
+          { text = tostring(value), style = "value" },
+        })
+      end
+    end
+  end
 
   state._info_panel_cb = cb
 
@@ -988,20 +1008,6 @@ local function shift_saturation(delta)
 
   local new_color = ColorUtils.hsl_to_hex(h, new_s, l)
   set_active_color(new_color)
-  schedule_render()
-end
-
----Toggle bold
-local function toggle_bold()
-  if not state then return end
-  state.current.bold = not state.current.bold
-  schedule_render()
-end
-
----Toggle italic
-local function toggle_italic()
-  if not state then return end
-  state.current.italic = not state.current.italic
   schedule_render()
 end
 
@@ -1297,8 +1303,6 @@ local function setup_multipanel_keymaps(multi)
 
   local common_keymaps = {}
 
-  common_keymaps[get_key("toggle_bold", "b")] = toggle_bold
-  common_keymaps[get_key("toggle_italic", "i")] = toggle_italic
   common_keymaps[get_key("toggle_bg", "B")] = toggle_bg_mode
   common_keymaps[get_key("clear_bg", "x")] = clear_bg
 
