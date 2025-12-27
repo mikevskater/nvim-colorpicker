@@ -50,6 +50,43 @@ local function get_or_create_hl(hex)
 end
 
 -- ============================================================================
+-- Helpers
+-- ============================================================================
+
+---Check if buffer filetype should be highlighted based on config
+---@param bufnr number Buffer number
+---@return boolean should_highlight
+local function should_highlight_buffer(bufnr)
+  local config = require('nvim-colorpicker.config').get()
+  local ft = vim.bo[bufnr].filetype
+
+  -- Check exclude list first
+  if config.highlight and config.highlight.exclude_filetypes then
+    for _, excluded in ipairs(config.highlight.exclude_filetypes) do
+      if ft == excluded then
+        return false
+      end
+    end
+  end
+
+  -- Check filetypes setting
+  if config.highlight and config.highlight.filetypes then
+    if config.highlight.filetypes == '*' then
+      return true
+    elseif type(config.highlight.filetypes) == 'table' then
+      for _, allowed in ipairs(config.highlight.filetypes) do
+        if ft == allowed then
+          return true
+        end
+      end
+      return false
+    end
+  end
+
+  return true
+end
+
+-- ============================================================================
 -- Buffer Highlighting
 -- ============================================================================
 
@@ -57,6 +94,11 @@ end
 ---@param bufnr number? Buffer number (default: current)
 function M.highlight_buffer(bufnr)
   bufnr = bufnr or vim.api.nvim_get_current_buf()
+
+  -- Check if this buffer should be excluded based on filetype
+  if not should_highlight_buffer(bufnr) then
+    return
+  end
 
   -- Clear existing highlights
   vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
@@ -162,39 +204,6 @@ end
 
 ---@type number? Autocmd group id
 local augroup = nil
-
----Check if buffer filetype should be highlighted based on config
----@param bufnr number Buffer number
----@return boolean should_highlight
-local function should_highlight_buffer(bufnr)
-  local config = require('nvim-colorpicker.config').get()
-  local ft = vim.bo[bufnr].filetype
-
-  -- Check exclude list first
-  if config.highlight and config.highlight.exclude_filetypes then
-    for _, excluded in ipairs(config.highlight.exclude_filetypes) do
-      if ft == excluded then
-        return false
-      end
-    end
-  end
-
-  -- Check filetypes setting
-  if config.highlight and config.highlight.filetypes then
-    if config.highlight.filetypes == '*' then
-      return true
-    elseif type(config.highlight.filetypes) == 'table' then
-      for _, allowed in ipairs(config.highlight.filetypes) do
-        if ft == allowed then
-          return true
-        end
-      end
-      return false
-    end
-  end
-
-  return true
-end
 
 ---Enable auto-highlighting for file patterns
 ---@param patterns string[]? File patterns (default: use config or common patterns)
