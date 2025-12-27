@@ -2,10 +2,13 @@
 ---@brief Interactive color picker with HSL grid navigation
 ---
 --- This is the main entry point for the color picker module.
---- During refactoring, this delegates to submodules for specific functionality.
+--- Delegates to submodules for specific functionality.
 
 local Types = require('nvim-colorpicker.picker.types')
 local State = require('nvim-colorpicker.picker.state')
+local Grid = require('nvim-colorpicker.picker.grid')
+local Preview = require('nvim-colorpicker.picker.preview')
+local Layout = require('nvim-colorpicker.picker.layout')
 local ColorUtils = require('nvim-colorpicker.color')
 local Config = require('nvim-colorpicker.config')
 local UiFloat = require('nvim-float.float')
@@ -22,517 +25,36 @@ ColorPicker.Types = Types
 -- Local References (from Types)
 -- ============================================================================
 
-local PREVIEW_BORDERS = Types.PREVIEW_BORDERS
-local PREVIEW_RATIO = Types.PREVIEW_RATIO
-local HEADER_HEIGHT = Types.HEADER_HEIGHT
-local PADDING = Types.PADDING
 local BASE_STEP_HUE = Types.BASE_STEP_HUE
 local BASE_STEP_LIGHTNESS = Types.BASE_STEP_LIGHTNESS
 local BASE_STEP_SATURATION = Types.BASE_STEP_SATURATION
-local STEP_SIZES = Types.STEP_SIZES
-local STEP_LABELS = Types.STEP_LABELS
-local DEFAULT_STEP_INDEX = Types.DEFAULT_STEP_INDEX
-local ALPHA_CHARS = Types.ALPHA_CHARS
 local COLOR_MODES = Types.COLOR_MODES
-local MIN_SIDE_BY_SIDE_WIDTH = Types.MIN_SIDE_BY_SIDE_WIDTH
-local INFO_PANEL_MIN_WIDTH = Types.INFO_PANEL_MIN_WIDTH
-local INFO_PANEL_MIN_HEIGHT = Types.INFO_PANEL_MIN_HEIGHT
 
 -- ============================================================================
 -- Helpers (using State module)
 -- ============================================================================
 
----Get the current color
----@return string hex
 local function get_active_color()
   return State.get_active_color()
 end
 
----Set the current color
----@param hex string
 local function set_active_color(hex)
   State.set_active_color(hex)
 end
 
----Get current step multiplier
----@return number
 local function get_step_multiplier()
   return State.get_step_multiplier()
 end
 
----Get current step label
----@return string
 local function get_step_label()
   return State.get_step_label()
-end
-
----Get the alpha visualization character for a given alpha value
----@param alpha number Alpha value 0-100
----@return string char The character representing the alpha level
-local function get_alpha_char(alpha)
-  for _, def in ipairs(ALPHA_CHARS) do
-    if alpha >= def.min and alpha <= def.max then
-      return def.char
-    end
-  end
-  return "█"
-end
-
----Map a virtual position to actual 0-100 value with bounce (triangular wave)
----@param virtual number Virtual position (unbounded)
----@return number actual Actual value (0-100)
-local function virtual_to_actual(virtual)
-  local period = 200
-  local normalized = virtual % period
-  if normalized < 0 then normalized = normalized + period end
-
-  if normalized <= 100 then
-    return normalized
-  else
-    return 200 - normalized
-  end
-end
-
----Calculate grid dimensions and preview rows based on window size
----@param win_width number
----@param win_height number
----@return number grid_width, number grid_height, number preview_rows
-local function calculate_grid_size(win_width, win_height)
-  local available_width = win_width - PADDING * 2
-
-  -- Fixed overhead: header (3 lines) + preview borders (2 lines for top/bottom)
-  local fixed_overhead = HEADER_HEIGHT + PREVIEW_BORDERS
-  local total_flexible = math.max(0, win_height - fixed_overhead)
-
-  -- Allocate space: preview gets ratio, grid gets the rest
-  local preview_rows = math.max(1, math.floor(total_flexible * PREVIEW_RATIO))
-  local grid_height = total_flexible - preview_rows
-
-  -- Apply odd-height preference for grid (better center alignment)
-  if grid_height % 2 == 0 and grid_height > 5 then
-    grid_height = grid_height - 1
-  end
-
-  -- Apply odd-width preference
-  if available_width % 2 == 0 then
-    available_width = available_width - 1
-  end
-
-  -- Enforce minimums
-  available_width = math.max(11, available_width)
-  grid_height = math.max(5, grid_height)
-  preview_rows = math.max(1, preview_rows)
-
-  -- Final validation: ensure total content fits in window
-  local total_content = HEADER_HEIGHT + grid_height + PREVIEW_BORDERS + preview_rows
-  if total_content > win_height then
-    local excess = total_content - win_height
-    grid_height = math.max(5, grid_height - excess)
-  end
-
-  return available_width, grid_height, preview_rows
-end
-
----Generate highlight group name for a grid cell
----@param row number
----@param col number
----@return string
-local function get_cell_hl_group(row, col)
-  return string.format("NvimColorPickerCell_%d_%d", row, col)
 end
 
 -- ============================================================================
 -- Rendering
 -- ============================================================================
 
----Create highlight groups for the color grid
----@param grid string[][] The color grid
-local function create_grid_highlights(grid)
-  local state = State.state
-  if not state then return end
-
-  local center_row = math.ceil(#grid / 2)
-  local center_col = math.ceil(#grid[1] / 2)
-
-  for row_idx, row in ipairs(grid) do
-    for col_idx, color in ipairs(row) do
-      local hl_name = get_cell_hl_group(row_idx, col_idx)
-      local hl_def
-
-      if row_idx == center_row and col_idx == center_col then
-        hl_def = {
-          fg = ColorUtils.get_contrast_color(color),
-          bg = color,
-          bold = true,
-        }
-      else
-        hl_def = { bg = color }
-      end
-
-      vim.api.nvim_set_hl(0, hl_name, hl_def)
-    end
-  end
-end
-
----Generate color grid with virtual lightness positions for continuous scrolling
----@return string[][] grid 2D array of hex colors [row][col]
-local function generate_virtual_grid()
-  local state = State.state
-  if not state then return {} end
-
-  local center_color = get_active_color()
-  local h, s, l = ColorUtils.hex_to_hsl(center_color)
-
-  if state.saved_hsl and (l < 2 or l > 98) then
-    h = state.saved_hsl.h
-    s = state.saved_hsl.s
-  end
-
-  local virtual_l = state.lightness_virtual or l
-
-  local grid = {}
-  local half_height = math.floor(state.grid_height / 2)
-  local half_width = math.floor(state.grid_width / 2)
-  local hue_step = BASE_STEP_HUE * get_step_multiplier()
-  local lightness_step = BASE_STEP_LIGHTNESS * get_step_multiplier()
-
-  for row = 1, state.grid_height do
-    local row_colors = {}
-    local row_offset = half_height + 1 - row
-    local row_virtual_l = virtual_l + (row_offset * lightness_step)
-    local row_actual_l = virtual_to_actual(row_virtual_l)
-
-    for col = 1, state.grid_width do
-      local col_offset = col - half_width - 1
-      local cell_h = (h + col_offset * hue_step) % 360
-      if cell_h < 0 then cell_h = cell_h + 360 end
-
-      local color = ColorUtils.hsl_to_hex(cell_h, s, row_actual_l)
-      table.insert(row_colors, color)
-    end
-
-    table.insert(grid, row_colors)
-  end
-
-  return grid
-end
-
----Render the color grid to buffer
----@return string[] lines
----@return table[] highlights
-local function render_grid()
-  local state = State.state
-  if not state then return {}, {} end
-
-  local lines = {}
-  local highlights = {}
-
-  local grid = generate_virtual_grid()
-  create_grid_highlights(grid)
-
-  local center_row = math.ceil(#grid / 2)
-  local center_col = math.ceil(#grid[1] / 2)
-
-  local pad = string.rep(" ", PADDING)
-
-  for row_idx, row in ipairs(grid) do
-    local line_chars = {}
-    local line_hls = {}
-
-    for col_idx, _ in ipairs(row) do
-      local char = " "
-      if row_idx == center_row and col_idx == center_col then
-        char = "X"
-      end
-      table.insert(line_chars, char)
-
-      table.insert(line_hls, {
-        col_start = PADDING + col_idx - 1,
-        col_end = PADDING + col_idx,
-        hl_group = get_cell_hl_group(row_idx, col_idx),
-      })
-    end
-
-    local line = pad .. table.concat(line_chars)
-    table.insert(lines, line)
-
-    for _, hl in ipairs(line_hls) do
-      table.insert(highlights, {
-        line = #lines - 1,
-        col_start = hl.col_start,
-        col_end = hl.col_end,
-        hl_group = hl.hl_group,
-      })
-    end
-  end
-
-  return lines, highlights
-end
-
----Render the split Original/Current preview section
----@return string[] lines
----@return table[] highlights
-local function render_preview()
-  local state = State.state
-  if not state then return {}, {} end
-
-  local lines = {}
-  local highlights = {}
-  local pad = string.rep(" ", PADDING)
-
-  local preview_width = state.grid_width
-  local half_width = math.floor((preview_width - 1) / 2)
-
-  local orig_color = state.original.color or "#808080"
-  local curr_color = state.current.color or "#808080"
-  local orig_alpha = state.original_alpha or 100
-  local curr_alpha = state.alpha or 100
-
-  local orig_char = get_alpha_char(orig_alpha)
-  local curr_char = get_alpha_char(curr_alpha)
-
-  vim.api.nvim_set_hl(0, "NvimColorPickerOriginalPreview", { fg = orig_color })
-  vim.api.nvim_set_hl(0, "NvimColorPickerCurrentPreview", { fg = curr_color })
-
-  local border_char = "─"
-  local orig_label = "Original"
-  local curr_label = "Current"
-
-  local orig_label_pos = math.floor((half_width - #orig_label) / 2)
-  local curr_label_pos = math.floor((half_width - #curr_label) / 2)
-
-  local top_border_left = string.rep(border_char, orig_label_pos) .. orig_label ..
-                          string.rep(border_char, half_width - orig_label_pos - #orig_label)
-  local top_border_right = string.rep(border_char, curr_label_pos) .. curr_label ..
-                           string.rep(border_char, half_width - curr_label_pos - #curr_label)
-  local top_border = pad .. top_border_left .. "┬" .. top_border_right
-
-  local top_visual_len = half_width * 2 + 1
-  local current_len = #top_border_left + 1 + #top_border_right
-  if current_len < preview_width then
-    top_border = top_border .. string.rep(border_char, preview_width - current_len)
-  end
-
-  table.insert(lines, pad .. top_border_left .. "┬" .. top_border_right)
-
-  local orig_block = string.rep(orig_char, half_width)
-  local curr_block = string.rep(curr_char, half_width)
-  local orig_block_bytes = half_width * #orig_char
-  local curr_block_bytes = half_width * #curr_char
-
-  local preview_rows = state.preview_rows or 2
-  for i = 1, preview_rows do
-    local preview_line = pad .. orig_block .. "│" .. curr_block
-    table.insert(lines, preview_line)
-
-    table.insert(highlights, {
-      line = #lines - 1,
-      col_start = PADDING,
-      col_end = PADDING + orig_block_bytes,
-      hl_group = "NvimColorPickerOriginalPreview",
-    })
-
-    local divider_bytes = 3
-    table.insert(highlights, {
-      line = #lines - 1,
-      col_start = PADDING + orig_block_bytes + divider_bytes,
-      col_end = PADDING + orig_block_bytes + divider_bytes + curr_block_bytes,
-      hl_group = "NvimColorPickerCurrentPreview",
-    })
-  end
-
-  table.insert(lines, pad .. string.rep(border_char, half_width) .. "┴" .. string.rep(border_char, half_width))
-
-  return lines, highlights
-end
-
--- ============================================================================
--- ContentBuilder Render Functions
--- ============================================================================
-
----Render header using ContentBuilder
----@return ContentBuilder cb The content builder with header content
-local function render_header_cb()
-  local state = State.state
-  local cb = ContentBuilder.new()
-
-  cb:blank()
-  cb:styled("  " .. (state and state.options.title or "Pick Color"), "header")
-  cb:blank()
-
-  return cb
-end
-
----Render footer (empty - preview is now integrated into the grid)
----@return ContentBuilder cb Empty content builder
----@return table swatch_info Empty (no longer used)
-local function render_footer_cb()
-  return ContentBuilder.new(), {}
-end
-
--- ============================================================================
--- Multipanel Layout and Rendering
--- ============================================================================
-
 local schedule_render_multipanel
-
----Create layout configuration for multipanel mode
----@return MultiPanelConfig
-local function create_layout_config()
-  local ui = vim.api.nvim_list_uis()[1]
-  local is_narrow = ui.width < MIN_SIDE_BY_SIDE_WIDTH
-
-  local min_preview_height = PREVIEW_BORDERS + 1
-  local grid_content_height = HEADER_HEIGHT + 11 + min_preview_height
-
-  if is_narrow then
-    return {
-      layout = {
-        split = "vertical",
-        children = {
-          {
-            name = "grid",
-            title = "Color Grid",
-            ratio = 0.70,
-            min_height = grid_content_height,
-            focusable = true,
-            cursorline = false,
-            filetype = "nvim-colorpicker-grid",
-          },
-          {
-            name = "info",
-            title = "Info",
-            ratio = 0.30,
-            min_height = INFO_PANEL_MIN_HEIGHT,
-            focusable = true,
-            cursorline = false,
-            filetype = "nvim-colorpicker-info",
-          },
-        }
-      },
-      total_width_ratio = 0.95,
-      total_height_ratio = 0.85,
-    }
-  else
-    return {
-      layout = {
-        split = "horizontal",
-        children = {
-          {
-            name = "grid",
-            title = "Color Grid",
-            ratio = 0.60,
-            min_width = 40,
-            focusable = true,
-            cursorline = false,
-            filetype = "nvim-colorpicker-grid",
-          },
-          {
-            name = "info",
-            title = "Info",
-            ratio = 0.40,
-            min_width = INFO_PANEL_MIN_WIDTH,
-            focusable = true,
-            cursorline = false,
-            filetype = "nvim-colorpicker-info",
-          },
-        }
-      },
-      total_width_ratio = 0.80,
-      total_height_ratio = 0.75,
-    }
-  end
-end
-
----Render the grid panel content
----@param multi_state MultiPanelState
----@return string[] lines
----@return table[] highlights
-local function render_grid_panel(multi_state)
-  local state = State.state
-  if not state then return {}, {} end
-
-  local all_lines = {}
-  local all_highlights = {}
-  local line_offset = 0
-
-  local panel = multi_state.panels["grid"]
-  if not panel or not panel.float or not panel.float:is_valid() then
-    return {}, {}
-  end
-
-  local panel_width = panel.rect.width
-  local panel_height = panel.rect.height
-
-  local grid_width, grid_height, preview_rows = calculate_grid_size(panel_width, panel_height)
-  state.grid_width = grid_width
-  state.grid_height = grid_height
-  state.preview_rows = preview_rows
-
-  local header_cb = render_header_cb()
-  local header_lines = header_cb:build_lines()
-  local header_highlights = header_cb:build_highlights()
-
-  for _, line in ipairs(header_lines) do
-    table.insert(all_lines, line)
-  end
-  for _, hl in ipairs(header_highlights) do
-    table.insert(all_highlights, {
-      line = hl.line + line_offset,
-      col_start = hl.col_start,
-      col_end = hl.col_end,
-      hl_group = hl.hl_group,
-    })
-  end
-  line_offset = #all_lines
-
-  local grid_lines, grid_highlights = render_grid()
-  for _, line in ipairs(grid_lines) do
-    table.insert(all_lines, line)
-  end
-  for _, hl in ipairs(grid_highlights) do
-    table.insert(all_highlights, {
-      line = hl.line + line_offset,
-      col_start = hl.col_start,
-      col_end = hl.col_end,
-      hl_group = hl.hl_group,
-    })
-  end
-  line_offset = #all_lines
-
-  local preview_lines, preview_highlights = render_preview()
-  for _, line in ipairs(preview_lines) do
-    table.insert(all_lines, line)
-  end
-  for _, hl in ipairs(preview_highlights) do
-    table.insert(all_highlights, {
-      line = hl.line + line_offset,
-      col_start = hl.col_start,
-      col_end = hl.col_end,
-      hl_group = hl.hl_group,
-    })
-  end
-
-  local footer_start_line = #all_lines
-
-  local footer_cb, swatch_info = render_footer_cb()
-  local footer_lines = footer_cb:build_lines()
-  local footer_highlights = footer_cb:build_highlights()
-
-  for _, line in ipairs(footer_lines) do
-    table.insert(all_lines, line)
-  end
-  for _, hl in ipairs(footer_highlights) do
-    table.insert(all_highlights, {
-      line = hl.line + footer_start_line,
-      col_start = hl.col_start,
-      col_end = hl.col_end,
-      hl_group = hl.hl_group,
-    })
-  end
-
-  return all_lines, all_highlights
-end
 
 ---Render the info panel content using ContentBuilder with interactive inputs
 ---@param multi_state MultiPanelState
@@ -847,7 +369,7 @@ local function shift_lightness(delta)
   local step = delta * BASE_STEP_LIGHTNESS * get_step_multiplier()
   state.lightness_virtual = state.lightness_virtual + step
 
-  local new_l = virtual_to_actual(state.lightness_virtual)
+  local new_l = Grid.virtual_to_actual(state.lightness_virtual)
 
   local new_h, new_s = h, s
   if state.saved_hsl and new_l > 2 and new_l < 98 then
@@ -875,7 +397,7 @@ local function shift_saturation(delta)
   local step = delta * BASE_STEP_SATURATION * get_step_multiplier()
   state.saturation_virtual = state.saturation_virtual + step
 
-  local new_s = virtual_to_actual(state.saturation_virtual)
+  local new_s = Grid.virtual_to_actual(state.saturation_virtual)
 
   if state.saved_hsl then
     state.saved_hsl.s = new_s
@@ -1140,14 +662,8 @@ function ColorPicker.close()
 
   pcall(vim.api.nvim_del_augroup_by_name, "NvimColorPickerFocusLoss")
 
-  for row = 1, grid_height do
-    for col = 1, grid_width do
-      pcall(vim.api.nvim_set_hl, 0, get_cell_hl_group(row, col), {})
-    end
-  end
-  pcall(vim.api.nvim_set_hl, 0, "NvimColorPickerPreview", {})
-  pcall(vim.api.nvim_set_hl, 0, "NvimColorPickerOriginalPreview", {})
-  pcall(vim.api.nvim_set_hl, 0, "NvimColorPickerCurrentPreview", {})
+  Grid.clear_grid_highlights(grid_height, grid_width)
+  Preview.clear_preview_highlights()
 
   if multipanel and multipanel:is_valid() then
     multipanel:close()
@@ -1464,7 +980,7 @@ function ColorPicker.show_multipanel(options)
     initial.color = "#808080"
   end
 
-  local layout_config = create_layout_config()
+  local layout_config = Layout.create_layout_config()
 
   local grid_title = options.title or "Color Grid"
 
@@ -1472,7 +988,7 @@ function ColorPicker.show_multipanel(options)
     layout_config.layout.children[1].title = grid_title
   end
 
-  layout_config.layout.children[1].on_render = render_grid_panel
+  layout_config.layout.children[1].on_render = Layout.render_grid_panel
   layout_config.layout.children[2].on_render = render_info_panel
 
   layout_config.layout.children[1].on_focus = function(multi_state)
@@ -1524,7 +1040,7 @@ function ColorPicker.show_multipanel(options)
 
   local grid_width, grid_height, preview_rows = 21, 9, 1
   if grid_panel and grid_panel.rect then
-    grid_width, grid_height, preview_rows = calculate_grid_size(grid_panel.rect.width, grid_panel.rect.height)
+    grid_width, grid_height, preview_rows = Grid.calculate_grid_size(grid_panel.rect.width, grid_panel.rect.height)
   end
 
   local resolved_keymaps = Config.get_keymaps()
