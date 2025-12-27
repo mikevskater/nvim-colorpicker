@@ -242,6 +242,9 @@ end
 -- History Tab Keymaps
 -- ============================================================================
 
+-- Autocmd ID for history CursorMoved handler
+local history_cursor_autocmd = nil
+
 ---Setup history-specific keymaps when history tab is active
 ---@param multi MultiPanelState
 ---@param schedule_render fun() Function to schedule a render
@@ -253,12 +256,7 @@ function M.setup_history_keymaps(multi, schedule_render)
 
   local history_keymaps = {}
 
-  history_keymaps["j"] = function()
-    HistoryTab.cursor_down(schedule_render)
-  end
-  history_keymaps["k"] = function()
-    HistoryTab.cursor_up(schedule_render)
-  end
+  -- Navigation uses default Neovim movement - CursorMoved autocmd syncs selection
   history_keymaps["<CR>"] = function()
     HistoryTab.select_current(schedule_render)
   end
@@ -271,6 +269,22 @@ function M.setup_history_keymaps(multi, schedule_render)
 
   -- Apply these keymaps to the info panel (which shows history content when history tab is active)
   multi:set_panel_keymaps("info", history_keymaps)
+
+  -- Setup CursorMoved autocmd for info panel to sync selection with cursor
+  local info_buf = multi:get_panel_buffer("info")
+  if info_buf and vim.api.nvim_buf_is_valid(info_buf) then
+    -- Clean up any existing autocmd
+    if history_cursor_autocmd then
+      pcall(vim.api.nvim_del_autocmd, history_cursor_autocmd)
+    end
+
+    history_cursor_autocmd = vim.api.nvim_create_autocmd("CursorMoved", {
+      buffer = info_buf,
+      callback = function()
+        HistoryTab.on_cursor_moved(schedule_render)
+      end,
+    })
+  end
 end
 
 ---Clear history-specific keymaps (when switching away from history tab)
@@ -278,11 +292,20 @@ end
 function M.clear_history_keymaps(multi)
   -- Reset to empty keymaps for the info panel
   multi:set_panel_keymaps("info", {})
+
+  -- Clean up CursorMoved autocmd
+  if history_cursor_autocmd then
+    pcall(vim.api.nvim_del_autocmd, history_cursor_autocmd)
+    history_cursor_autocmd = nil
+  end
 end
 
 -- ============================================================================
 -- Presets Tab Keymaps
 -- ============================================================================
+
+-- Autocmd ID for presets CursorMoved handler
+local presets_cursor_autocmd = nil
 
 ---Setup presets-specific keymaps when presets tab is active
 ---@param multi MultiPanelState
@@ -295,12 +318,7 @@ function M.setup_presets_keymaps(multi, schedule_render)
 
   local presets_keymaps = {}
 
-  presets_keymaps["j"] = function()
-    PresetsTab.cursor_down(schedule_render)
-  end
-  presets_keymaps["k"] = function()
-    PresetsTab.cursor_up(schedule_render)
-  end
+  -- Navigation uses default Neovim movement - CursorMoved autocmd syncs selection
   presets_keymaps["<CR>"] = function()
     PresetsTab.select_current(schedule_render)
   end
@@ -326,12 +344,34 @@ function M.setup_presets_keymaps(multi, schedule_render)
 
   -- Apply these keymaps to the info panel
   multi:set_panel_keymaps("info", presets_keymaps)
+
+  -- Setup CursorMoved autocmd for info panel to sync selection with cursor
+  local info_buf = multi:get_panel_buffer("info")
+  if info_buf and vim.api.nvim_buf_is_valid(info_buf) then
+    -- Clean up any existing autocmd
+    if presets_cursor_autocmd then
+      pcall(vim.api.nvim_del_autocmd, presets_cursor_autocmd)
+    end
+
+    presets_cursor_autocmd = vim.api.nvim_create_autocmd("CursorMoved", {
+      buffer = info_buf,
+      callback = function()
+        PresetsTab.on_cursor_moved(schedule_render)
+      end,
+    })
+  end
 end
 
 ---Clear presets-specific keymaps (when switching away from presets tab)
 ---@param multi MultiPanelState
 function M.clear_presets_keymaps(multi)
   multi:set_panel_keymaps("info", {})
+
+  -- Clean up CursorMoved autocmd
+  if presets_cursor_autocmd then
+    pcall(vim.api.nvim_del_autocmd, presets_cursor_autocmd)
+    presets_cursor_autocmd = nil
+  end
 end
 
 return M

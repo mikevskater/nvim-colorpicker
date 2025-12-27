@@ -128,42 +128,58 @@ local function build_flat_items(search)
 end
 
 -- ============================================================================
--- Presets Navigation
+-- Cursor Management
 -- ============================================================================
 
----Move cursor up in presets
+---Calculate header line offset (tab bar + content header)
+---@return number offset Lines before first item
+local function get_header_offset()
+  local state = State.state
+  if not state then return 0 end
+
+  -- Tab bar: 2 lines (tab line + separator)
+  -- Content: 1 blank line
+  -- Search: 2 lines if active (search indicator + blank)
+  local offset = 2 + 1  -- tab bar + blank
+  if state.presets_search and state.presets_search ~= "" then
+    offset = offset + 2  -- search indicator + blank
+  end
+  return offset
+end
+
+---Handle CursorMoved event - sync presets_cursor from buffer cursor
 ---@param schedule_render fun() Function to trigger re-render
-function M.cursor_up(schedule_render)
+function M.on_cursor_moved(schedule_render)
   local state = State.state
   if not state then return end
 
-  local items = build_flat_items(state.presets_search)
-  if #items == 0 then return end
+  -- Only handle when presets tab is active
+  if state.active_tab ~= "presets" then return end
 
-  state.presets_cursor = state.presets_cursor - 1
-  if state.presets_cursor < 1 then
-    state.presets_cursor = #items
+  local cursor_line = vim.api.nvim_win_get_cursor(0)[1]
+  local header_offset = get_header_offset()
+  local items = build_flat_items(state.presets_search)
+
+  -- Calculate item index from cursor line
+  local item_idx = cursor_line - header_offset
+
+  -- Clamp to valid range
+  if item_idx < 1 then
+    item_idx = 1
+  elseif item_idx > #items then
+    item_idx = #items
   end
 
-  schedule_render()
-end
-
----Move cursor down in presets
----@param schedule_render fun() Function to trigger re-render
-function M.cursor_down(schedule_render)
-  local state = State.state
-  if not state then return end
-
-  local items = build_flat_items(state.presets_search)
-  if #items == 0 then return end
-
-  state.presets_cursor = state.presets_cursor + 1
-  if state.presets_cursor > #items then
-    state.presets_cursor = 1
+  -- Only update and re-render if selection changed
+  if state.presets_cursor ~= item_idx and #items > 0 then
+    state.presets_cursor = item_idx
+    schedule_render()
   end
-
-  schedule_render()
 end
+
+-- ============================================================================
+-- Presets Navigation (for programmatic use)
+-- ============================================================================
 
 ---Toggle expand/collapse of current item
 ---@param schedule_render fun() Function to trigger re-render
@@ -296,6 +312,14 @@ function M.render_presets_content(cb)
       cb:styled("  Try a different search", "muted")
     end
   else
+    -- Calculate max color name length for alignment
+    local max_name_len = 0
+    for _, item in ipairs(items) do
+      if item.type == "color" and item.color_name then
+        max_name_len = math.max(max_name_len, #item.color_name)
+      end
+    end
+
     -- Render all items - nvim-float handles scrolling
     for i, item in ipairs(items) do
       local is_selected = i == state.presets_cursor
@@ -317,10 +341,12 @@ function M.render_presets_content(cb)
       elseif item.type == "color" then
         local style = is_selected and "emphasis" or "normal"
         local swatch_hl = get_swatch_highlight(item.hex)
+        -- Pad color name to align swatches
+        local padded_name = item.color_name .. string.rep(" ", max_name_len - #item.color_name)
 
         cb:spans({
           { text = string.format(" %s%s", prefix_char, indent), style = style },
-          { text = item.color_name, style = style },
+          { text = padded_name, style = style },
           { text = " ", style = "normal" },
           { text = "  ", hl_group = swatch_hl },
         })

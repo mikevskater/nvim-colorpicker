@@ -41,42 +41,50 @@ local function get_swatch_highlight(hex)
 end
 
 -- ============================================================================
--- History Navigation
+-- Cursor Management
 -- ============================================================================
 
----Move cursor up in history
+---Calculate header line offset (tab bar + content header)
+---@return number offset Lines before first history item
+local function get_header_offset()
+  -- Tab bar: 2 lines (tab line + separator)
+  -- Content: 1 blank line + "Recent (N)" header + 1 blank line = 3 lines
+  return 2 + 3  -- 5 total lines before first item
+end
+
+---Handle CursorMoved event - sync history_cursor from buffer cursor
 ---@param schedule_render fun() Function to trigger re-render
-function M.cursor_up(schedule_render)
+function M.on_cursor_moved(schedule_render)
   local state = State.state
   if not state then return end
 
-  local history = History.get_recent(MAX_DISPLAY_ITEMS)
-  if #history == 0 then return end
+  -- Only handle when history tab is active
+  if state.active_tab ~= "history" then return end
 
-  state.history_cursor = state.history_cursor - 1
-  if state.history_cursor < 1 then
-    state.history_cursor = #history
+  local cursor_line = vim.api.nvim_win_get_cursor(0)[1]
+  local header_offset = get_header_offset()
+  local history = History.get_recent(MAX_DISPLAY_ITEMS)
+
+  -- Calculate item index from cursor line
+  local item_idx = cursor_line - header_offset
+
+  -- Clamp to valid range
+  if item_idx < 1 then
+    item_idx = 1
+  elseif item_idx > #history then
+    item_idx = #history
   end
 
-  schedule_render()
-end
-
----Move cursor down in history
----@param schedule_render fun() Function to trigger re-render
-function M.cursor_down(schedule_render)
-  local state = State.state
-  if not state then return end
-
-  local history = History.get_recent(MAX_DISPLAY_ITEMS)
-  if #history == 0 then return end
-
-  state.history_cursor = state.history_cursor + 1
-  if state.history_cursor > #history then
-    state.history_cursor = 1
+  -- Only update and re-render if selection changed
+  if state.history_cursor ~= item_idx and #history > 0 then
+    state.history_cursor = item_idx
+    schedule_render()
   end
-
-  schedule_render()
 end
+
+-- ============================================================================
+-- History Navigation (for programmatic use)
+-- ============================================================================
 
 ---Select the currently highlighted history item
 ---@param schedule_render fun() Function to trigger re-render
