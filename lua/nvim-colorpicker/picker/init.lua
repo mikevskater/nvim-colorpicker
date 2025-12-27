@@ -55,13 +55,16 @@ local function render_multipanel()
       -- Need to setup InputManager
       InfoPanel.setup_info_panel_input_manager(multi, schedule_render)
     end
-    -- Clear history keymaps when not on history tab
+    -- Clear tab-specific keymaps when on info tab
     Keymaps.clear_history_keymaps(multi)
   elseif active_tab == "history" then
     -- Setup history keymaps
     Keymaps.setup_history_keymaps(multi, schedule_render)
+  elseif active_tab == "presets" then
+    -- Setup presets keymaps
+    Keymaps.setup_presets_keymaps(multi, schedule_render)
   else
-    -- Clear history keymaps for other tabs
+    -- Clear tab-specific keymaps for unknown tabs
     Keymaps.clear_history_keymaps(multi)
   end
 

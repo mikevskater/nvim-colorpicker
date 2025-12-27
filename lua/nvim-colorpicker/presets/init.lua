@@ -16,8 +16,8 @@ M.tailwind = require('nvim-colorpicker.presets.tailwind')
 ---@return string[] names List of preset names
 function M.get_preset_names()
   local names = {}
-  for name, _ in pairs(M) do
-    if type(M[name]) == "table" and M[name].colors then
+  for name, preset in pairs(M) do
+    if type(preset) == "table" and preset.groups then
       table.insert(names, name)
     end
   end
@@ -30,39 +30,67 @@ end
 ---@return table<string, string>? preset Dict of color names to hex values
 function M.get_preset(name)
   local preset = M[name]
-  if not preset or not preset.colors then return nil end
+  if not preset or not preset.groups then return nil end
 
-  -- Convert array format to dict format for easier lookup
+  -- Flatten groups into dict format for easier lookup
   local result = {}
-  for _, color in ipairs(preset.colors) do
-    result[color.name] = color.hex
+  for _, group in ipairs(preset.groups) do
+    for _, color in ipairs(group.colors) do
+      result[color.name] = color.hex
+    end
   end
   return result
 end
 
----Get raw preset data (with name and colors array)
+---Get raw preset data (with name and groups array)
 ---@param name string Preset name
 ---@return table? preset The raw preset table
 function M.get_preset_raw(name)
   return M[name]
 end
 
+---Get all groups for a preset
+---@param preset_name string Preset name
+---@return table[]? groups Array of group tables with name and colors
+function M.get_groups(preset_name)
+  local preset = M[preset_name]
+  if not preset or not preset.groups then return nil end
+  return preset.groups
+end
+
+---Get total color count for a preset
+---@param preset_name string Preset name
+---@return number count Total number of colors
+function M.get_color_count(preset_name)
+  local preset = M[preset_name]
+  if not preset or not preset.groups then return 0 end
+
+  local count = 0
+  for _, group in ipairs(preset.groups) do
+    count = count + #group.colors
+  end
+  return count
+end
+
 ---Search for a color by name across all presets
 ---@param query string Search query (partial match)
----@return table[] matches Array of {preset, name, hex}
+---@return table[] matches Array of {preset, group, name, hex}
 function M.search(query)
   local matches = {}
   query = query:lower()
 
   for preset_name, preset in pairs(M) do
-    if type(preset) == "table" and preset.colors then
-      for _, color in ipairs(preset.colors) do
-        if color.name:lower():find(query, 1, true) then
-          table.insert(matches, {
-            preset = preset_name,
-            name = color.name,
-            hex = color.hex,
-          })
+    if type(preset) == "table" and preset.groups then
+      for _, group in ipairs(preset.groups) do
+        for _, color in ipairs(group.colors) do
+          if color.name:lower():find(query, 1, true) then
+            table.insert(matches, {
+              preset = preset_name,
+              group = group.name,
+              name = color.name,
+              hex = color.hex,
+            })
+          end
         end
       end
     end
@@ -77,12 +105,14 @@ end
 ---@return string? hex The hex color or nil
 function M.get_color(preset_name, color_name)
   local preset = M[preset_name]
-  if not preset or not preset.colors then return nil end
+  if not preset or not preset.groups then return nil end
 
   local lower_name = color_name:lower()
-  for _, color in ipairs(preset.colors) do
-    if color.name:lower() == lower_name then
-      return color.hex
+  for _, group in ipairs(preset.groups) do
+    for _, color in ipairs(group.colors) do
+      if color.name:lower() == lower_name then
+        return color.hex
+      end
     end
   end
 

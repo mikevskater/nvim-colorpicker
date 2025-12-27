@@ -13,6 +13,10 @@ local function get_history_tab()
   return require('nvim-colorpicker.picker.history_tab')
 end
 
+local function get_presets_tab()
+  return require('nvim-colorpicker.picker.presets_tab')
+end
+
 -- ============================================================================
 -- Controls Definition (for UiFloat help popup)
 -- ============================================================================
@@ -273,6 +277,60 @@ end
 ---@param multi MultiPanelState
 function M.clear_history_keymaps(multi)
   -- Reset to empty keymaps for the info panel
+  multi:set_panel_keymaps("info", {})
+end
+
+-- ============================================================================
+-- Presets Tab Keymaps
+-- ============================================================================
+
+---Setup presets-specific keymaps when presets tab is active
+---@param multi MultiPanelState
+---@param schedule_render fun() Function to schedule a render
+function M.setup_presets_keymaps(multi, schedule_render)
+  local state = State.state
+  if not state then return end
+
+  local PresetsTab = get_presets_tab()
+
+  local presets_keymaps = {}
+
+  presets_keymaps["j"] = function()
+    PresetsTab.cursor_down(schedule_render)
+  end
+  presets_keymaps["k"] = function()
+    PresetsTab.cursor_up(schedule_render)
+  end
+  presets_keymaps["<CR>"] = function()
+    PresetsTab.select_current(schedule_render)
+  end
+  presets_keymaps["l"] = function()
+    PresetsTab.toggle_expand(schedule_render)
+  end
+  presets_keymaps["h"] = function()
+    -- Collapse current or parent
+    PresetsTab.toggle_expand(schedule_render)
+  end
+  presets_keymaps["zo"] = function()
+    PresetsTab.toggle_expand(schedule_render)
+  end
+  presets_keymaps["zc"] = function()
+    PresetsTab.toggle_expand(schedule_render)
+  end
+  presets_keymaps["zR"] = function()
+    PresetsTab.expand_all(schedule_render)
+  end
+  presets_keymaps["zM"] = function()
+    PresetsTab.collapse_all(schedule_render)
+  end
+
+  -- Apply these keymaps to the info panel
+  multi:set_panel_keymaps("info", presets_keymaps)
+end
+
+---Clear presets-specific keymaps (when switching away from presets tab)
+---@param multi MultiPanelState
+function M.clear_presets_keymaps(multi)
   multi:set_panel_keymaps("info", {})
 end
 
