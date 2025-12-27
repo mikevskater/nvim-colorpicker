@@ -239,6 +239,10 @@ function M.enable_auto(patterns)
     callback = function(ev)
       -- Check if this buffer should be highlighted
       if not should_highlight_buffer(ev.buf) then
+        -- Clear any existing highlights if buffer should be excluded
+        if active_buffers[ev.buf] then
+          M.clear_buffer(ev.buf)
+        end
         return
       end
 
@@ -251,6 +255,17 @@ function M.enable_auto(patterns)
         end, 100)
       else
         M.highlight_buffer(ev.buf)
+      end
+    end,
+  })
+
+  -- Also listen for FileType to handle buffers whose filetype is set after BufEnter
+  vim.api.nvim_create_autocmd("FileType", {
+    group = augroup,
+    callback = function(ev)
+      -- If this buffer was highlighted but should now be excluded, clear it
+      if active_buffers[ev.buf] and not should_highlight_buffer(ev.buf) then
+        M.clear_buffer(ev.buf)
       end
     end,
   })
