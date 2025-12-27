@@ -59,11 +59,13 @@ end
 local function should_highlight_buffer(bufnr)
   local config = require('nvim-colorpicker.config').get()
   local ft = vim.bo[bufnr].filetype
+  vim.notify("Checking if buffer " .. bufnr .. " with filetype '" .. ft .. "' should be highlighted", vim.log.levels.DEBUG)
 
   -- Check exclude list first
   if config.highlight and config.highlight.exclude_filetypes then
     for _, excluded in ipairs(config.highlight.exclude_filetypes) do
       if ft == excluded then
+        vim.notify("Buffer " .. bufnr .. " with filetype '" .. ft .. "' is excluded from highlighting", vim.log.levels.DEBUG)
         return false
       end
     end
@@ -72,13 +74,16 @@ local function should_highlight_buffer(bufnr)
   -- Check filetypes setting
   if config.highlight and config.highlight.filetypes then
     if config.highlight.filetypes == '*' then
+      vim.notify("Buffer " .. bufnr .. " with filetype '" .. ft .. "' is allowed for highlighting (all filetypes)", vim.log.levels.DEBUG)
       return true
     elseif type(config.highlight.filetypes) == 'table' then
       for _, allowed in ipairs(config.highlight.filetypes) do
         if ft == allowed then
+          vim.notify("Buffer " .. bufnr .. " with filetype '" .. ft .. "' is allowed for highlighting", vim.log.levels.DEBUG)
           return true
         end
       end
+      vim.notify("Buffer " .. bufnr .. " with filetype '" .. ft .. "' is not allowed for highlighting", vim.log.levels.DEBUG)
       return false
     end
   end
