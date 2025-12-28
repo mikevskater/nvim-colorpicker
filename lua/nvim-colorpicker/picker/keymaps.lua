@@ -44,7 +44,7 @@ function M.get_controls_definition()
     {
       header = "Color Mode",
       keys = {
-        { key = "m", desc = "Cycle mode (HSL/RGB/CMYK/HSV)" },
+        { key = "m", desc = "Cycle mode (Hex/HSL/RGB/HSV/CMYK)" },
         { key = "f", desc = "Toggle format (standard/decimal)" },
       }
     },

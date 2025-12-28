@@ -37,6 +37,58 @@
 
 local M = {}
 
+-- ============================================================================
+-- Global Keymap Detection
+-- ============================================================================
+
+---Detect movement keys from global Neovim keymaps using nvim_get_keymap API
+---Looks for any key that maps TO h/j/k/l movement commands
+---@return table<string, string> Detected movement keys
+local function detect_global_movement_keys()
+  local detected = {
+    nav_left = 'h',
+    nav_right = 'l',
+    nav_up = 'k',
+    nav_down = 'j',
+  }
+
+  -- Get all normal mode global mappings
+  local mappings = vim.api.nvim_get_keymap('n')
+
+  -- Look for mappings where rhs is a movement key
+  for _, map in ipairs(mappings) do
+    local lhs = map.lhs
+    local rhs = map.rhs or ''
+
+    -- Skip if lhs is not a single character (we want simple key remaps)
+    if #lhs ~= 1 then
+      goto continue
+    end
+
+    -- Normalize rhs: trim whitespace, handle simple cases
+    rhs = rhs:gsub('^%s+', ''):gsub('%s+$', '')
+
+    -- Check if this key maps directly to a movement command
+    if rhs == 'h' then
+      detected.nav_left = lhs
+    elseif rhs == 'j' then
+      detected.nav_down = lhs
+    elseif rhs == 'k' then
+      detected.nav_up = lhs
+    elseif rhs == 'l' then
+      detected.nav_right = lhs
+    end
+
+    ::continue::
+  end
+
+  -- Derive saturation keys (uppercase versions of detected nav keys)
+  detected.sat_up = detected.nav_up:upper()
+  detected.sat_down = detected.nav_down:upper()
+
+  return detected
+end
+
 ---Default configuration
 ---@type NvimColorPickerConfig
 M.defaults = {
@@ -45,6 +97,11 @@ M.defaults = {
   alpha_enabled = false,
   recent_colors_count = 10,
   presets = {},
+
+  -- Auto-detect movement keys from global Neovim keymaps
+  -- If true, checks for remapped h/j/k/l keys and uses those
+  -- Useful for alternative keyboard layouts (Colemak, Dvorak, etc.)
+  inherit_movement_keys = true,
 
   -- Inline color highlighting
   highlight = {
@@ -104,7 +161,36 @@ M.config = vim.deepcopy(M.defaults)
 ---@param opts NvimColorPickerConfig? User configuration options
 function M.setup(opts)
   opts = opts or {}
+
+  -- Start with defaults
   M.config = vim.tbl_deep_extend('force', M.defaults, opts)
+
+  -- Auto-detect movement keys if enabled and user didn't override them
+  if M.config.inherit_movement_keys then
+    local detected = detect_global_movement_keys()
+
+    -- Only apply detected keys if user didn't explicitly set them
+    local user_keymaps = opts.keymaps or {}
+
+    if not user_keymaps.nav_left then
+      M.config.keymaps.nav_left = detected.nav_left
+    end
+    if not user_keymaps.nav_right then
+      M.config.keymaps.nav_right = detected.nav_right
+    end
+    if not user_keymaps.nav_up then
+      M.config.keymaps.nav_up = detected.nav_up
+    end
+    if not user_keymaps.nav_down then
+      M.config.keymaps.nav_down = detected.nav_down
+    end
+    if not user_keymaps.sat_up then
+      M.config.keymaps.sat_up = detected.sat_up
+    end
+    if not user_keymaps.sat_down then
+      M.config.keymaps.sat_down = detected.sat_down
+    end
+  end
 end
 
 ---Get current configuration

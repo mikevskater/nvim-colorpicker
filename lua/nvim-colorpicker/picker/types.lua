@@ -115,8 +115,8 @@ M.ALPHA_CHARS = {
 -- Color Modes
 -- ============================================================================
 
--- Color modes available
-M.COLOR_MODES = { "hsl", "rgb", "cmyk", "hsv" }
+-- Color modes available (hex shows raw hex in header, others show formatted values)
+M.COLOR_MODES = { "hex", "hsl", "rgb", "hsv", "cmyk" }
 
 -- ============================================================================
 -- Panel Layout Constants

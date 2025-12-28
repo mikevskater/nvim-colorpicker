@@ -5,8 +5,9 @@ local State = require('nvim-colorpicker.picker.state')
 local Grid = require('nvim-colorpicker.picker.grid')
 local Preview = require('nvim-colorpicker.picker.preview')
 local Navigation = require('nvim-colorpicker.picker.navigation')
+local Actions = require('nvim-colorpicker.picker.actions')
+local Format = require('nvim-colorpicker.picker.format')
 local ColorUtils = require('nvim-colorpicker.color')
-local Types = require('nvim-colorpicker.picker.types')
 local Config = require('nvim-colorpicker.config')
 local UiFloat = require('nvim-float.float')
 
@@ -22,149 +23,41 @@ local WIDTH_RATIO = 0.40
 local HEIGHT_RATIO = 0.35
 
 -- Controls definition for help popup (ControlsDefinition[] format)
-local MINI_CONTROLS = {
-  {
-    header = "Navigation",
-    keys = {
-      { key = "h/l", desc = "Adjust hue (left/right)" },
-      { key = "j/k", desc = "Adjust lightness (down/up)" },
-      { key = "J/K", desc = "Adjust saturation" },
-      { key = "a/A", desc = "Adjust alpha (if enabled)" },
-      { key = "-/+", desc = "Decrease/increase step size" },
+-- Built dynamically to reflect configured keymaps
+local function build_controls_definition(cfg)
+  return {
+    {
+      header = "Navigation",
+      keys = {
+        { key = cfg.nav_left .. "/" .. cfg.nav_right, desc = "Adjust hue (left/right)" },
+        { key = cfg.nav_down .. "/" .. cfg.nav_up, desc = "Adjust lightness (down/up)" },
+        { key = cfg.sat_down .. "/" .. cfg.sat_up, desc = "Adjust saturation" },
+        { key = cfg.alpha_down .. "/" .. cfg.alpha_up, desc = "Adjust alpha (if enabled)" },
+        { key = cfg.step_down .. "/+", desc = "Decrease/increase step size" },
+      },
     },
-  },
-  {
-    header = "Display",
-    keys = {
-      { key = "m", desc = "Cycle color mode (hex/hsl/rgb/hsv/cmyk)" },
-      { key = "f", desc = "Toggle value format (percent/decimal)" },
-      { key = "#", desc = "Enter hex color directly" },
+    {
+      header = "Display",
+      keys = {
+        { key = cfg.cycle_mode, desc = "Cycle color mode (hex/hsl/rgb/hsv/cmyk)" },
+        { key = cfg.cycle_format, desc = "Toggle value format (percent/decimal)" },
+        { key = cfg.hex_input, desc = "Enter hex color directly" },
+      },
     },
-  },
-  {
-    header = "Actions",
-    keys = {
-      { key = "r", desc = "Reset to original color" },
-      { key = "Enter", desc = "Apply color and close" },
-      { key = "q/Esc", desc = "Cancel and close" },
+    {
+      header = "Actions",
+      keys = {
+        { key = cfg.reset, desc = "Reset to original color" },
+        { key = "Enter", desc = "Apply color and close" },
+        { key = "q/Esc", desc = "Cancel and close" },
+      },
     },
-  },
-}
-
--- ============================================================================
--- Header Formatting
--- ============================================================================
-
--- Mini picker color modes (includes hex)
-local MINI_COLOR_MODES = { "hex", "hsl", "rgb", "hsv", "cmyk" }
-
----Format color value for header based on current mode and value format
----@param hex string The hex color
----@param mode string Color mode (hex, hsl, rgb, hsv, cmyk)
----@param alpha number? Alpha value 0-100
----@param alpha_enabled boolean Whether alpha is enabled
----@param value_format "standard"|"decimal" Value display format
----@return string formatted The formatted color string
-local function format_header_color(hex, mode, alpha, alpha_enabled, value_format)
-  local r, g, b = ColorUtils.hex_to_rgb(hex)
-  local h, s, l = ColorUtils.hex_to_hsl(hex)
-  local hv, sv, v = ColorUtils.hex_to_hsv(hex)
-  local c, m, y, k = ColorUtils.hex_to_cmyk(hex)
-
-  local is_decimal = value_format == "decimal"
-
-  -- Alpha as 0-255 for hex, 0-100 for others, 0.0-1.0 for decimal
-  local alpha_hex = alpha_enabled and string.format("%02X", math.floor((alpha / 100) * 255 + 0.5)) or ""
-
-  if mode == "hex" then
-    if alpha_enabled then
-      return hex .. alpha_hex
-    else
-      return hex
-    end
-  elseif mode == "hsl" then
-    if is_decimal then
-      local hd, sd, ld = h / 360, s / 100, l / 100
-      local ad = alpha / 100
-      if alpha_enabled then
-        return string.format("hsla(%.2f, %.2f, %.2f, %.2f)", hd, sd, ld, ad)
-      else
-        return string.format("hsl(%.2f, %.2f, %.2f)", hd, sd, ld)
-      end
-    else
-      if alpha_enabled then
-        return string.format("hsla(%d, %d%%, %d%%, %d%%)", math.floor(h), math.floor(s), math.floor(l), alpha)
-      else
-        return string.format("hsl(%d, %d%%, %d%%)", math.floor(h), math.floor(s), math.floor(l))
-      end
-    end
-  elseif mode == "rgb" then
-    if is_decimal then
-      local rd, gd, bd = r / 255, g / 255, b / 255
-      local ad = alpha / 100
-      if alpha_enabled then
-        return string.format("rgba(%.2f, %.2f, %.2f, %.2f)", rd, gd, bd, ad)
-      else
-        return string.format("rgb(%.2f, %.2f, %.2f)", rd, gd, bd)
-      end
-    else
-      if alpha_enabled then
-        return string.format("rgba(%d, %d, %d, %d%%)", r, g, b, alpha)
-      else
-        return string.format("rgb(%d, %d, %d)", r, g, b)
-      end
-    end
-  elseif mode == "hsv" then
-    if is_decimal then
-      local hvd, svd, vd = hv / 360, sv / 100, v / 100
-      local ad = alpha / 100
-      if alpha_enabled then
-        return string.format("hsva(%.2f, %.2f, %.2f, %.2f)", hvd, svd, vd, ad)
-      else
-        return string.format("hsv(%.2f, %.2f, %.2f)", hvd, svd, vd)
-      end
-    else
-      if alpha_enabled then
-        return string.format("hsva(%d, %d%%, %d%%, %d%%)", math.floor(hv), math.floor(sv), math.floor(v), alpha)
-      else
-        return string.format("hsv(%d, %d%%, %d%%)", math.floor(hv), math.floor(sv), math.floor(v))
-      end
-    end
-  elseif mode == "cmyk" then
-    if is_decimal then
-      local cd, md, yd, kd = c / 100, m / 100, y / 100, k / 100
-      return string.format("cmyk(%.2f, %.2f, %.2f, %.2f)", cd, md, yd, kd)
-    else
-      return string.format("cmyk(%d, %d, %d, %d)", math.floor(c), math.floor(m), math.floor(y), math.floor(k))
-    end
-  else
-    -- Fallback to hex
-    if alpha_enabled then
-      return hex .. alpha_hex
-    else
-      return hex
-    end
-  end
+  }
 end
 
----Cycle through mini picker color modes
----@param schedule_render fun() Function to schedule a render
-local function cycle_mini_mode(schedule_render)
-  local state = State.state
-  if not state then return end
-
-  local current_idx = 1
-  for i, mode in ipairs(MINI_COLOR_MODES) do
-    if mode == state.color_mode then
-      current_idx = i
-      break
-    end
-  end
-
-  local next_idx = (current_idx % #MINI_COLOR_MODES) + 1
-  state.color_mode = MINI_COLOR_MODES[next_idx]
-  schedule_render()
-end
+-- ============================================================================
+-- Title Building
+-- ============================================================================
 
 ---Build the title string with color and step size
 ---@return string title
@@ -172,16 +65,14 @@ local function build_title()
   local state = State.state
   if not state then return "Pick Color" end
 
-  local color_str = format_header_color(
+  return Format.build_title(
     state.current.color,
     state.color_mode,
     state.alpha,
     state.alpha_enabled,
-    state.value_format or "standard"
+    state.value_format or "standard",
+    State.get_step_label()
   )
-  local step_label = State.get_step_label()
-
-  return string.format(" %s | %s ", color_str, step_label)
 end
 
 -- ============================================================================
@@ -369,6 +260,9 @@ end
 local function render()
   if not mini_float or not mini_float:is_valid() then return end
 
+  local state = State.state
+  if not state then return end
+
   local win_config = vim.api.nvim_win_get_config(mini_float.winid)
   local inner_width = win_config.width
   local inner_height = win_config.height
@@ -397,47 +291,17 @@ local function render()
 
   -- Update title
   update_title()
+
+  -- Call on_change callback
+  if state.options.on_change then
+    local result = Actions.build_result()
+    state.options.on_change(result)
+  end
 end
 
----Schedule a render
+---Schedule a render for next frame
 local function schedule_render()
   vim.schedule(render)
-end
-
--- ============================================================================
--- Actions
--- ============================================================================
-
----Apply and close
-local function apply()
-  local state = State.state
-  if not state then return end
-
-  local result = vim.deepcopy(state.current)
-  result.alpha = state.alpha_enabled and state.alpha or nil
-  local on_select = state.options.on_select
-
-  M.close()
-
-  if on_select then
-    on_select(result)
-  end
-end
-
----Cancel and close
-local function cancel()
-  local state = State.state
-  if not state then return end
-
-  if state.options.on_change then
-    state.options.on_change(vim.deepcopy(state.original))
-  end
-
-  if state.options.on_cancel then
-    state.options.on_cancel()
-  end
-
-  M.close()
 end
 
 -- ============================================================================
@@ -449,9 +313,7 @@ function M.close()
   local state = State.state
 
   if state then
-    local grid_height = state.grid_height or 5
-    local grid_width = state.grid_width or 15
-    Grid.clear_grid_highlights(grid_height, grid_width)
+    Actions.cleanup_highlights(state.grid_height, state.grid_width)
   end
 
   State.clear_state()
@@ -510,10 +372,21 @@ function M.pick(opts)
   local alpha_enabled = opts.alpha ~= nil or config.alpha_enabled
   local initial_alpha = opts.alpha or 100
 
+  -- Get configured keymaps
+  local cfg = Config.get_keymaps()
+  if opts.keymaps then
+    cfg = vim.tbl_deep_extend('force', cfg, opts.keymaps)
+  end
+
+  -- Helper to get key from config
+  local function get_key(name, default)
+    return cfg[name] or default
+  end
+
   -- Initialize state
   local initial = { color = initial_color }
 
-  -- Create minimal options for state
+  -- Create options for state
   local state_options = {
     initial = initial,
     on_select = opts.on_select,
@@ -534,75 +407,119 @@ function M.pick(opts)
     grid_height,
     1,  -- preview_rows
     vim.api.nvim_create_namespace("nvim_colorpicker_mini"),
-    {},  -- keymaps (use defaults)
+    cfg,  -- pass resolved keymaps
     nil, -- no multipanel
     nil, -- no grid_buf
     nil  -- no grid_win
   )
 
-  -- Build keymaps
-  local keymaps = {
-    ["h"] = function()
-      local count = vim.v.count1
-      Navigation.shift_hue(-count, schedule_render)
-    end,
-    ["l"] = function()
-      local count = vim.v.count1
-      Navigation.shift_hue(count, schedule_render)
-    end,
-    ["k"] = function()
-      local count = vim.v.count1
-      Navigation.shift_lightness(count, schedule_render)
-    end,
-    ["j"] = function()
-      local count = vim.v.count1
-      Navigation.shift_lightness(-count, schedule_render)
-    end,
-    ["K"] = function()
-      local count = vim.v.count1
-      Navigation.shift_saturation(count, schedule_render)
-    end,
-    ["J"] = function()
-      local count = vim.v.count1
-      Navigation.shift_saturation(-count, schedule_render)
-    end,
-    ["-"] = function()
-      State.decrease_step_size(schedule_render)
-    end,
-    ["+"] = function()
-      State.increase_step_size(schedule_render)
-    end,
-    ["="] = function()
-      State.increase_step_size(schedule_render)
-    end,
-    ["m"] = function()
-      cycle_mini_mode(schedule_render)
-    end,
-    ["f"] = function()
-      Navigation.cycle_format(schedule_render)
-    end,
-    ["r"] = function()
-      Navigation.reset_color(schedule_render)
-    end,
-    ["#"] = function()
-      Navigation.enter_hex_input(schedule_render)
-    end,
-    ["<CR>"] = apply,
-    ["q"] = cancel,
-    ["<Esc>"] = cancel,
-  }
+  -- Build keymaps using config
+  local keymaps = {}
 
-  -- Add alpha keymaps if enabled
+  -- Navigation keymaps
+  keymaps[get_key("nav_left", "h")] = function()
+    local count = vim.v.count1
+    Navigation.shift_hue(-count, schedule_render)
+  end
+  keymaps[get_key("nav_right", "l")] = function()
+    local count = vim.v.count1
+    Navigation.shift_hue(count, schedule_render)
+  end
+  keymaps[get_key("nav_up", "k")] = function()
+    local count = vim.v.count1
+    Navigation.shift_lightness(count, schedule_render)
+  end
+  keymaps[get_key("nav_down", "j")] = function()
+    local count = vim.v.count1
+    Navigation.shift_lightness(-count, schedule_render)
+  end
+  keymaps[get_key("sat_up", "K")] = function()
+    local count = vim.v.count1
+    Navigation.shift_saturation(count, schedule_render)
+  end
+  keymaps[get_key("sat_down", "J")] = function()
+    local count = vim.v.count1
+    Navigation.shift_saturation(-count, schedule_render)
+  end
+
+  -- Step size keymaps
+  keymaps[get_key("step_down", "-")] = function()
+    State.decrease_step_size(schedule_render)
+  end
+  local step_up_keys = get_key("step_up", { "+", "=" })
+  if type(step_up_keys) == "table" then
+    for _, k in ipairs(step_up_keys) do
+      keymaps[k] = function()
+        State.increase_step_size(schedule_render)
+      end
+    end
+  else
+    keymaps[step_up_keys] = function()
+      State.increase_step_size(schedule_render)
+    end
+  end
+
+  -- Mode and format keymaps
+  keymaps[get_key("cycle_mode", "m")] = function()
+    Navigation.cycle_mode(schedule_render)
+  end
+  keymaps[get_key("cycle_format", "f")] = function()
+    Navigation.cycle_format(schedule_render)
+  end
+
+  -- Action keymaps
+  keymaps[get_key("reset", "r")] = function()
+    Navigation.reset_color(schedule_render)
+  end
+  keymaps[get_key("hex_input", "#")] = function()
+    Navigation.enter_hex_input(schedule_render)
+  end
+  keymaps[get_key("apply", "<CR>")] = function()
+    Actions.apply(M.close)
+  end
+
+  -- Cancel keymaps (supports array)
+  local cancel_keys = get_key("cancel", { "q", "<Esc>" })
+  if type(cancel_keys) == "table" then
+    for _, k in ipairs(cancel_keys) do
+      keymaps[k] = function()
+        Actions.cancel(M.close)
+      end
+    end
+  else
+    keymaps[cancel_keys] = function()
+      Actions.cancel(M.close)
+    end
+  end
+
+  -- Alpha keymaps (always add if alpha is enabled)
   if alpha_enabled then
-    keymaps["a"] = function()
+    keymaps[get_key("alpha_down", "a")] = function()
       local count = vim.v.count1
       Navigation.adjust_alpha(-count, schedule_render)
     end
-    keymaps["A"] = function()
+    keymaps[get_key("alpha_up", "A")] = function()
       local count = vim.v.count1
       Navigation.adjust_alpha(count, schedule_render)
     end
   end
+
+  -- Build controls definition with resolved keymaps
+  local controls = build_controls_definition({
+    nav_left = get_key("nav_left", "h"),
+    nav_right = get_key("nav_right", "l"),
+    nav_up = get_key("nav_up", "k"),
+    nav_down = get_key("nav_down", "j"),
+    sat_up = get_key("sat_up", "K"),
+    sat_down = get_key("sat_down", "J"),
+    alpha_up = get_key("alpha_up", "A"),
+    alpha_down = get_key("alpha_down", "a"),
+    step_down = get_key("step_down", "-"),
+    cycle_mode = get_key("cycle_mode", "m"),
+    cycle_format = get_key("cycle_format", "f"),
+    hex_input = get_key("hex_input", "#"),
+    reset = get_key("reset", "r"),
+  })
 
   -- Create the floating window
   mini_float = UiFloat.create({
@@ -622,7 +539,7 @@ function M.pick(opts)
     cursorline = false,
     scrollbar = false,
     filetype = "nvim-colorpicker-mini",
-    controls = MINI_CONTROLS,
+    controls = controls,
     on_close = function()
       State.clear_state()
       mini_float = nil

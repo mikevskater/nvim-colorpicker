@@ -3,6 +3,7 @@
 
 local State = require('nvim-colorpicker.picker.state')
 local ColorUtils = require('nvim-colorpicker.color')
+local Format = require('nvim-colorpicker.picker.format')
 local ContentBuilder = require('nvim-float.content_builder')
 
 local M = {}
@@ -28,11 +29,7 @@ function M.render_info_content(cb)
 
   cb:blank()
 
-  local hex_display = current_hex
-  if state.alpha_enabled and state.color_mode ~= "cmyk" then
-    local alpha_byte = math.floor((state.alpha / 100) * 255 + 0.5)
-    hex_display = current_hex .. string.format("%02X", alpha_byte)
-  end
+  local hex_display = Format.get_hex_display(current_hex, state.alpha, state.alpha_enabled, state.color_mode)
   cb:spans({
     { text = "  Hex: ", style = "label" },
     { text = hex_display, style = "value" },

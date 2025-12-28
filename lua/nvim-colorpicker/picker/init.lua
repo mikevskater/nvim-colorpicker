@@ -12,9 +12,9 @@ local Layout = require('nvim-colorpicker.picker.layout')
 local Navigation = require('nvim-colorpicker.picker.navigation')
 local InfoPanel = require('nvim-colorpicker.picker.info_tab')
 local Keymaps = require('nvim-colorpicker.picker.keymaps')
+local Actions = require('nvim-colorpicker.picker.actions')
 local ColorUtils = require('nvim-colorpicker.color')
 local Config = require('nvim-colorpicker.config')
-local History = require('nvim-colorpicker.history')
 local UiFloat = require('nvim-float.float')
 local MultiPanel = require('nvim-float.float.multipanel')
 
@@ -27,11 +27,12 @@ ColorPicker.Types = Types
 -- Rendering
 -- ============================================================================
 
-local schedule_render_multipanel
-local schedule_render  -- Forward declaration
+-- Forward declarations
+local render_multipanel
+local schedule_render
 
 ---Render all multipanel panels
-local function render_multipanel()
+render_multipanel = function()
   local state = State.state
   if not state or not state._multipanel then return end
 
@@ -56,80 +57,34 @@ local function render_multipanel()
     Keymaps.clear_history_keymaps(multi)
   end
 
+  -- Call on_change callback
   if state.options.on_change then
-    local result = vim.deepcopy(state.current)
-    result.alpha = state.alpha_enabled and state.alpha or nil
-    if state.options.custom_controls and #state.options.custom_controls > 0 then
-      result.custom = vim.deepcopy(state.custom_values)
-    end
+    local result = Actions.build_result()
     state.options.on_change(result)
   end
 end
 
----Schedule a render for multipanel mode
-schedule_render_multipanel = function()
-  local state = State.state
-  if not state or not state._multipanel then return end
-
-  if state._render_pending then return end
-
-  state._render_pending = true
+---Schedule a render for the next event loop iteration (simple, no debounce)
+schedule_render = function()
   vim.schedule(function()
     if State.state and State.state._multipanel then
       render_multipanel()
-      State.state._render_pending = false
     end
   end)
-end
-
----Schedule a render for the next event loop iteration
-schedule_render = function()
-  if not State.state then return end
-  schedule_render_multipanel()
 end
 
 -- ============================================================================
 -- Apply/Cancel Actions
 -- ============================================================================
 
----Apply and close
+---Apply and close (using shared Actions module)
 local function apply()
-  local state = State.state
-  if not state then return end
-
-  local result = vim.deepcopy(state.current)
-  result.alpha = state.alpha_enabled and state.alpha or nil
-  if state.options.custom_controls and #state.options.custom_controls > 0 then
-    result.custom = vim.deepcopy(state.custom_values)
-  end
-  local on_select = state.options.on_select
-
-  -- Add selected color to history
-  if result.color then
-    History.add_recent(result.color)
-  end
-
-  ColorPicker.close()
-
-  if on_select then
-    on_select(result)
-  end
+  Actions.apply(ColorPicker.close)
 end
 
----Cancel and close
+---Cancel and close (using shared Actions module)
 local function cancel()
-  local state = State.state
-  if not state then return end
-
-  if state.options.on_change then
-    state.options.on_change(vim.deepcopy(state.original))
-  end
-
-  if state.options.on_cancel then
-    state.options.on_cancel()
-  end
-
-  ColorPicker.close()
+  Actions.cancel(ColorPicker.close)
 end
 
 -- ============================================================================
@@ -141,16 +96,10 @@ function ColorPicker.close()
   local state = State.state
   if not state then return end
 
-  local grid_height = state.grid_height or 20
-  local grid_width = state.grid_width or 60
   local multipanel = state._multipanel
 
-  State.clear_state()
-
-  pcall(vim.api.nvim_del_augroup_by_name, "NvimColorPickerFocusLoss")
-
-  Grid.clear_grid_highlights(grid_height, grid_width)
-  Preview.clear_preview_highlights()
+  -- Use shared cleanup (clears state, augroup, and highlights)
+  Actions.full_cleanup("NvimColorPickerFocusLoss")
 
   if multipanel and multipanel:is_valid() then
     multipanel:close()
