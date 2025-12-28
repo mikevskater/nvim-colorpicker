@@ -47,9 +47,9 @@ end
 ---Calculate header line offset (tab bar + content header)
 ---@return number offset Lines before first history item
 local function get_header_offset()
-  -- Tab bar: 2 lines (tab line + separator)
+  -- Tab bar: 3 lines (blank + tab labels + separator)
   -- Content: 1 blank line + "Recent (N)" header + 1 blank line = 3 lines
-  return 2 + 3  -- 5 total lines before first item
+  return 3 + 3  -- 6 total lines before first item
 end
 
 ---Handle CursorMoved event - sync history_cursor from buffer cursor

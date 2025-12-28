@@ -105,7 +105,23 @@ end
 function M.reset_color(schedule_render)
   local state = State.state
   if not state then return end
+
+  -- Reset color
   state.current = vim.deepcopy(state.original)
+
+  -- Reset virtual positions (clears bounce state)
+  state.lightness_virtual = nil
+  state.saturation_virtual = nil
+
+  -- Update saved HSL from original color
+  local h, s, _ = ColorUtils.hex_to_hsl(state.original.color)
+  state.saved_hsl = { h = h, s = s }
+
+  -- Reset alpha if enabled
+  if state.alpha_enabled and state.original_alpha then
+    state.alpha = state.original_alpha
+  end
+
   schedule_render()
 end
 

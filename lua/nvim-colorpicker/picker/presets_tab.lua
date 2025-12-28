@@ -137,10 +137,10 @@ local function get_header_offset()
   local state = State.state
   if not state then return 0 end
 
-  -- Tab bar: 2 lines (tab line + separator)
+  -- Tab bar: 3 lines (blank + tab labels + separator)
   -- Content: 1 blank line
   -- Search: 2 lines if active (search indicator + blank)
-  local offset = 2 + 1  -- tab bar + blank
+  local offset = 3 + 1  -- tab bar + blank
   if state.presets_search and state.presets_search ~= "" then
     offset = offset + 2  -- search indicator + blank
   end
