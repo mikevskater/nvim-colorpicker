@@ -232,10 +232,8 @@ function M.setup_multipanel_keymaps(multi, schedule_render, apply, cancel)
 
   multi:set_keymaps(common_keymaps)
 
-  -- Info panel-specific keymaps (set on info panel)
-  local info_keymaps = {}
-  -- Info panel has InputManager, so most navigation is handled there
-  multi:set_panel_keymaps("info", info_keymaps)
+  -- Info panel keymaps (empty - navigation uses native cursor movement)
+  multi:set_panel_keymaps("info", {})
 end
 
 -- ============================================================================
@@ -272,6 +270,7 @@ function M.setup_history_keymaps(multi, schedule_render)
 
   -- Setup CursorMoved autocmd for info panel to sync selection with cursor
   local info_buf = multi:get_panel_buffer("info")
+  local info_win = multi:get_panel_window("info")
   if info_buf and vim.api.nvim_buf_is_valid(info_buf) then
     -- Clean up any existing autocmd
     if history_cursor_autocmd then
@@ -284,6 +283,9 @@ function M.setup_history_keymaps(multi, schedule_render)
         HistoryTab.on_cursor_moved()
       end,
     })
+
+    -- Restore cursor position from saved state
+    HistoryTab.restore_cursor(info_win)
   end
 end
 
@@ -347,6 +349,7 @@ function M.setup_presets_keymaps(multi, schedule_render)
 
   -- Setup CursorMoved autocmd for info panel to sync selection with cursor
   local info_buf = multi:get_panel_buffer("info")
+  local info_win = multi:get_panel_window("info")
   if info_buf and vim.api.nvim_buf_is_valid(info_buf) then
     -- Clean up any existing autocmd
     if presets_cursor_autocmd then
@@ -359,6 +362,9 @@ function M.setup_presets_keymaps(multi, schedule_render)
         PresetsTab.on_cursor_moved()
       end,
     })
+
+    -- Restore cursor position from saved state
+    PresetsTab.restore_cursor(info_win)
   end
 end
 

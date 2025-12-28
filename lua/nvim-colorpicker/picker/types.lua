@@ -58,8 +58,6 @@ local M = {}
 ---@field alpha_enabled boolean Whether alpha editing is available
 ---@field focused_panel "grid"|"info" Currently focused panel
 ---@field _multipanel table? MultiPanelWindow instance (for multipanel mode)
----@field _info_panel_cb table? ContentBuilder for info panel (stores inputs)
----@field _info_input_manager table? InputManager for info panel
 ---@field _keymaps table? Resolved keymaps
 ---@field custom_values table<string, any> Current values for custom controls
 ---@field active_tab "info"|"history"|"presets" Currently active tab in right panel

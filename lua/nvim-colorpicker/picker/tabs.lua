@@ -85,17 +85,6 @@ function M.switch_tab(tab_name, schedule_render)
   -- Don't switch if already on this tab
   if state.active_tab == tab_name then return end
 
-  local old_tab = state.active_tab
-
-  -- Cleanup old tab's InputManager if needed
-  if old_tab == "info" and state._info_input_manager then
-    state._info_input_manager:destroy()
-    state._info_input_manager = nil
-    state._info_panel_cb = nil
-  end
-  -- Add cleanup for other tabs as they're implemented
-  -- if old_tab == "presets" and state._presets_input_manager then ...
-
   -- Set new tab
   state.active_tab = tab_name
 

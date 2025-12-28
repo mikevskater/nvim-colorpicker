@@ -81,6 +81,29 @@ function M.on_cursor_moved()
   end
 end
 
+---Restore cursor position from saved state when switching to history tab
+---@param winid number Window ID of the info panel
+function M.restore_cursor(winid)
+  local state = State.state
+  if not state then return end
+  if not winid or not vim.api.nvim_win_is_valid(winid) then return end
+
+  local history = History.get_recent(MAX_DISPLAY_ITEMS)
+  if #history == 0 then return end
+
+  -- Clamp cursor to valid range
+  local cursor_idx = state.history_cursor or 1
+  if cursor_idx < 1 then cursor_idx = 1 end
+  if cursor_idx > #history then cursor_idx = #history end
+  state.history_cursor = cursor_idx
+
+  -- Calculate target line: header_offset + cursor_index
+  local target_line = get_header_offset() + cursor_idx
+
+  -- Set cursor position (line, col) - col 0 for start of line
+  pcall(vim.api.nvim_win_set_cursor, winid, { target_line, 0 })
+end
+
 -- ============================================================================
 -- History Navigation (for programmatic use)
 -- ============================================================================

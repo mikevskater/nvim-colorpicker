@@ -41,53 +41,17 @@ local function render_multipanel()
   multi:render_panel("grid")
   multi:render_panel("info")
 
-  -- Handle tab-specific InputManager lifecycle
+  -- Handle tab-specific keymaps
   if active_tab == "info" then
-    -- Setup or update InputManager for info tab
-    if state._info_input_manager and state._info_panel_cb then
-      local cb = state._info_panel_cb
-      -- Tab bar adds 2 lines at the top - offset input positions
-      local TAB_BAR_HEIGHT = 2
-      local raw_inputs = cb:get_inputs()
-      local offset_inputs = {}
-      for key, input in pairs(raw_inputs) do
-        offset_inputs[key] = vim.tbl_extend("force", input, {
-          line = input.line + TAB_BAR_HEIGHT,
-        })
-      end
-      state._info_input_manager:update_inputs(
-        offset_inputs,
-        cb:get_input_order()
-      )
-      InfoPanel.update_input_validation_settings()
-    elseif state._info_panel_cb and not state._info_input_manager then
-      -- Need to setup InputManager
-      InfoPanel.setup_info_panel_input_manager(multi, schedule_render)
-    end
     -- Clear tab-specific keymaps when on info tab
     Keymaps.clear_history_keymaps(multi)
   elseif active_tab == "history" then
-    -- Destroy InputManager when leaving info tab (removes j/k keymaps)
-    if state._info_input_manager then
-      state._info_input_manager:destroy()
-      state._info_input_manager = nil
-    end
     -- Setup history keymaps
     Keymaps.setup_history_keymaps(multi, schedule_render)
   elseif active_tab == "presets" then
-    -- Destroy InputManager when leaving info tab (removes j/k keymaps)
-    if state._info_input_manager then
-      state._info_input_manager:destroy()
-      state._info_input_manager = nil
-    end
     -- Setup presets keymaps
     Keymaps.setup_presets_keymaps(multi, schedule_render)
   else
-    -- Destroy InputManager for unknown tabs
-    if state._info_input_manager then
-      state._info_input_manager:destroy()
-      state._info_input_manager = nil
-    end
     -- Clear tab-specific keymaps for unknown tabs
     Keymaps.clear_history_keymaps(multi)
   end
@@ -180,11 +144,6 @@ function ColorPicker.close()
   local grid_height = state.grid_height or 20
   local grid_width = state.grid_width or 60
   local multipanel = state._multipanel
-  local input_manager = state._info_input_manager
-
-  if input_manager then
-    input_manager:destroy()
-  end
 
   State.clear_state()
 
@@ -245,14 +204,6 @@ function ColorPicker.show_multipanel(options)
     local Tabs = require('nvim-colorpicker.picker.tabs')
     multi_state:update_panel_title("info", Tabs.get_panel_title(true))
     multi_state:update_panel_title("grid", grid_title)
-    -- Only focus input field if on info tab
-    if State.state and State.state.active_tab == "info" and State.state._info_input_manager then
-      vim.schedule(function()
-        if State.state and State.state._info_input_manager then
-          State.state._info_input_manager:focus_first_field()
-        end
-      end)
-    end
   end
 
   layout_config.layout.children[2].on_blur = function(multi_state)
@@ -305,7 +256,6 @@ function ColorPicker.show_multipanel(options)
 
   Keymaps.setup_multipanel_keymaps(multi, schedule_render, apply, cancel)
   render_multipanel()
-  InfoPanel.setup_info_panel_input_manager(multi, schedule_render)
 
   local augroup = vim.api.nvim_create_augroup("NvimColorPickerFocusLoss", { clear = true })
 
