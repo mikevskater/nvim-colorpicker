@@ -27,6 +27,22 @@ end, {
   desc = 'Pick and replace color at cursor',
 })
 
+vim.api.nvim_create_user_command('ColorPickerMini', function(opts)
+  local colorpicker = require('nvim-colorpicker')
+  local initial_color = opts.args ~= '' and opts.args or nil
+  colorpicker.pick_mini({ color = initial_color })
+end, {
+  nargs = '?',
+  desc = 'Open compact inline color picker (optional: initial color)',
+})
+
+vim.api.nvim_create_user_command('ColorPickerMiniAtCursor', function()
+  local colorpicker = require('nvim-colorpicker')
+  colorpicker.pick_mini_at_cursor()
+end, {
+  desc = 'Pick and replace color at cursor with mini picker',
+})
+
 vim.api.nvim_create_user_command('ColorConvert', function(opts)
   local colorpicker = require('nvim-colorpicker')
   local format = opts.args ~= '' and opts.args or 'hex'
@@ -86,6 +102,25 @@ end, {
     return { 'toggle', 'on', 'off', 'auto', 'noauto', 'background', 'foreground', 'virtualtext' }
   end,
   desc = 'Toggle or configure color highlighting in buffer',
+})
+
+-- History command
+vim.api.nvim_create_user_command('ColorHistory', function(opts)
+  local colorpicker = require('nvim-colorpicker')
+  local count = opts.args ~= '' and tonumber(opts.args) or 10
+  local colors = colorpicker.get_recent_colors(count)
+  if #colors == 0 then
+    vim.notify('No recent colors in history', vim.log.levels.INFO)
+    return
+  end
+  local lines = { 'Recent colors:' }
+  for i, hex in ipairs(colors) do
+    table.insert(lines, string.format('  %d. %s', i, hex))
+  end
+  vim.notify(table.concat(lines, '\n'), vim.log.levels.INFO)
+end, {
+  nargs = '?',
+  desc = 'Show recent color history (optional: count)',
 })
 
 -- Preset search command

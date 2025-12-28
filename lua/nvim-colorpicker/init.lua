@@ -59,6 +59,10 @@ local function get_highlight()
   return require('nvim-colorpicker.highlight')
 end
 
+local function get_mini()
+  return require('nvim-colorpicker.picker.mini')
+end
+
 ---Setup nvim-colorpicker with options
 ---@param opts NvimColorPickerConfig? Configuration options
 function M.setup(opts)
@@ -186,6 +190,54 @@ end
 ---@return boolean
 function M.is_open()
   return get_picker().is_open()
+end
+
+-- ============================================================================
+-- Mini Picker
+-- ============================================================================
+
+---@class NvimColorPickerMiniOptions
+---@field color string? Initial color (hex string, default: #808080)
+---@field alpha number? Initial alpha value 0-100 (enables alpha mode if provided)
+---@field on_select fun(result: table)? Called when user confirms
+---@field on_cancel fun()? Called when user cancels
+---@field on_change fun(result: table)? Called on every color change
+
+---Open compact inline color picker near cursor
+---@param opts NvimColorPickerMiniOptions? Options for the mini picker
+function M.pick_mini(opts)
+  get_mini().pick(opts)
+end
+
+---Detect color at cursor and open mini picker for replacement
+function M.pick_mini_at_cursor()
+  local detect = get_detect()
+  local color_info = detect.get_color_at_cursor()
+
+  if not color_info then
+    vim.notify('No color found at cursor', vim.log.levels.WARN)
+    return
+  end
+
+  M.pick_mini({
+    color = color_info.color,
+    alpha = color_info.alpha or 100,  -- Always enable alpha mode
+    on_select = function(result)
+      local new_color = result.color or color_info.color
+      detect.replace_color_at_cursor(new_color, color_info, result.alpha)
+    end,
+  })
+end
+
+---Check if mini picker is currently open
+---@return boolean
+function M.is_mini_open()
+  return get_mini().is_open()
+end
+
+---Close the mini picker if open
+function M.close_mini()
+  get_mini().close()
 end
 
 -- ============================================================================
