@@ -65,6 +65,7 @@ local M = {}
 ---@field presets_cursor number Selected item index in presets tab
 ---@field presets_expanded table<string, boolean> Expanded state of preset categories
 ---@field presets_search string Current search query in presets tab
+---@field slider_focus number Which slider row is focused (1-indexed)
 
 -- ============================================================================
 -- Layout Constants

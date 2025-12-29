@@ -44,16 +44,19 @@ render_multipanel = function()
 
   -- Handle tab-specific keymaps
   if active_tab == "info" then
-    -- Clear tab-specific keymaps when on info tab
-    Keymaps.clear_history_keymaps(multi)
+    -- Setup info tab keymaps (for slider adjustment)
+    Keymaps.setup_info_keymaps(multi, schedule_render)
   elseif active_tab == "history" then
-    -- Setup history keymaps
+    -- Clear info keymaps first, then setup history keymaps
+    Keymaps.clear_info_keymaps(multi)
     Keymaps.setup_history_keymaps(multi, schedule_render)
   elseif active_tab == "presets" then
-    -- Setup presets keymaps
+    -- Clear info keymaps first, then setup presets keymaps
+    Keymaps.clear_info_keymaps(multi)
     Keymaps.setup_presets_keymaps(multi, schedule_render)
   else
     -- Clear tab-specific keymaps for unknown tabs
+    Keymaps.clear_info_keymaps(multi)
     Keymaps.clear_history_keymaps(multi)
   end
 

@@ -28,7 +28,7 @@
 local M = {}
 
 ---Plugin version
-M.version = '1.9.4'
+M.version = '1.9.5'
 
 -- Lazy-load modules
 local function get_config()
@@ -238,6 +238,38 @@ end
 ---Close the mini picker if open
 function M.close_mini()
   get_mini().close()
+end
+
+---Open compact inline color picker in slider mode (no grid)
+---@param opts NvimColorPickerMiniOptions? Options for the mini picker
+function M.pick_mini_slider(opts)
+  get_mini().pick_slider(opts)
+end
+
+---Detect color at cursor and open mini picker in slider mode for replacement
+function M.pick_mini_slider_at_cursor()
+  local detect = get_detect()
+  local color_info = detect.get_color_at_cursor()
+
+  if not color_info then
+    vim.notify('No color found at cursor', vim.log.levels.WARN)
+    return
+  end
+
+  M.pick_mini_slider({
+    color = color_info.color,
+    alpha = color_info.alpha or 100,
+    on_select = function(result)
+      local new_color = result.color or color_info.color
+      detect.replace_color_at_cursor(new_color, color_info, result.alpha)
+    end,
+  })
+end
+
+---Check if mini picker is in slider mode
+---@return boolean
+function M.is_mini_slider_mode()
+  return get_mini().is_slider_mode()
 end
 
 -- ============================================================================

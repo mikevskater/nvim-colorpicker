@@ -43,6 +43,22 @@ end, {
   desc = 'Pick and replace color at cursor with mini picker',
 })
 
+vim.api.nvim_create_user_command('ColorPickerMiniSlider', function(opts)
+  local colorpicker = require('nvim-colorpicker')
+  local initial_color = opts.args ~= '' and opts.args or nil
+  colorpicker.pick_mini_slider({ color = initial_color })
+end, {
+  nargs = '?',
+  desc = 'Open mini picker in slider mode (optional: initial color)',
+})
+
+vim.api.nvim_create_user_command('ColorPickerMiniSliderAtCursor', function()
+  local colorpicker = require('nvim-colorpicker')
+  colorpicker.pick_mini_slider_at_cursor()
+end, {
+  desc = 'Pick and replace color at cursor with mini picker in slider mode',
+})
+
 vim.api.nvim_create_user_command('ColorConvert', function(opts)
   local colorpicker = require('nvim-colorpicker')
   local format = opts.args ~= '' and opts.args or 'hex'

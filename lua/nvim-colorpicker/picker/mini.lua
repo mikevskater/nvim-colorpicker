@@ -7,11 +7,16 @@ local Preview = require('nvim-colorpicker.picker.preview')
 local Navigation = require('nvim-colorpicker.picker.navigation')
 local Actions = require('nvim-colorpicker.picker.actions')
 local Format = require('nvim-colorpicker.picker.format')
+local Slider = require('nvim-colorpicker.picker.slider')
 local ColorUtils = require('nvim-colorpicker.color')
 local Config = require('nvim-colorpicker.config')
 local UiFloat = require('nvim-float.float')
 
 local M = {}
+
+-- Module-level state for slider mode
+local slider_mode = false
+local slider_focus = 1  -- 1-indexed focused slider
 
 -- ============================================================================
 -- Constants
@@ -27,13 +32,21 @@ local HEIGHT_RATIO = 0.35
 local function build_controls_definition(cfg)
   return {
     {
-      header = "Navigation",
+      header = "Grid Mode",
       keys = {
         { key = cfg.nav_left .. "/" .. cfg.nav_right, desc = "Adjust hue (left/right)" },
         { key = cfg.nav_down .. "/" .. cfg.nav_up, desc = "Adjust lightness (down/up)" },
         { key = cfg.sat_down .. "/" .. cfg.sat_up, desc = "Adjust saturation" },
         { key = cfg.alpha_down .. "/" .. cfg.alpha_up, desc = "Adjust alpha (if enabled)" },
         { key = cfg.step_down .. "/+", desc = "Decrease/increase step size" },
+      },
+    },
+    {
+      header = "Slider Mode",
+      keys = {
+        { key = "s", desc = "Toggle slider mode" },
+        { key = cfg.nav_down .. "/" .. cfg.nav_up, desc = "Navigate sliders" },
+        { key = cfg.step_down .. "/+", desc = "Adjust focused slider" },
       },
     },
     {
@@ -243,6 +256,154 @@ local function render_content(width, height)
   return lines, highlights
 end
 
+---Render the mini picker in slider mode
+---@param width number Window inner width
+---@param height number Window inner height
+---@return string[] lines
+---@return table[] highlights
+local function render_sliders_content(width, height)
+  local state = State.state
+  if not state then return {}, {} end
+
+  local lines = {}
+  local highlights = {}
+
+  -- Get components for current mode
+  local components = Slider.get_components(state.color_mode, state.alpha_enabled)
+  local values = Slider.get_component_values(state.current.color, state.color_mode, state.alpha)
+
+  -- Calculate slider width (leave room for label and value)
+  -- Format: "  L: ████░░░░ 100%"
+  -- ~6 chars for label ("  L: "), ~6 chars for value (" 100%"), rest for slider
+  local slider_width = math.max(8, width - 12)
+
+  -- Layout: sliders at top, preview anchored at bottom, padding in between
+  -- Preview takes 2 lines (separator + color blocks)
+  -- Sliders take #components lines
+  local slider_lines = #components
+  local preview_lines = 2
+  local padding_lines = math.max(1, height - slider_lines - preview_lines)
+
+  -- Add a blank line at top for visual spacing
+  table.insert(lines, "")
+
+  -- Helper to pad based on display width (handles multi-byte chars like °)
+  local function pad_display(str, width)
+    local display_width = vim.fn.strdisplaywidth(str)
+    local padding = math.max(0, width - display_width)
+    return string.rep(" ", padding) .. str
+  end
+
+  -- Render each slider
+  for i, comp in ipairs(components) do
+    local value = values[comp.key] or 0
+    local slider_str = Slider.render_slider(value, comp.min, comp.max, slider_width)
+    local formatted = ColorUtils.format_value(value, comp.unit, state.value_format or "standard")
+    local value_padded = pad_display(formatted, 5)
+
+    local line = string.format("  %s: %s %s", comp.label, slider_str, value_padded)
+    table.insert(lines, line)
+
+    local line_idx = #lines - 1
+
+    -- Highlight focused slider differently
+    local is_focused = (i == slider_focus)
+    if is_focused then
+      -- Add emphasis highlight for focused row
+      table.insert(highlights, {
+        line = line_idx,
+        col_start = 0,
+        col_end = #line,
+        hl_group = "CursorLine",
+      })
+    end
+  end
+
+  -- Add padding lines to push preview to bottom
+  -- Subtract 1 for the top blank line we already added
+  for _ = 1, padding_lines - 1 do
+    table.insert(lines, "")
+  end
+
+  -- Build separator row (same as grid mode)
+  local half_width = math.floor(width / 2)
+  local orig_label = "Original"
+  local curr_label = "Current"
+
+  local left_dashes = math.floor((half_width - #orig_label) / 2)
+  local right_dashes_left = half_width - left_dashes - #orig_label
+  local right_half = width - half_width - 1
+  local left_dashes_right = math.floor((right_half - #curr_label) / 2)
+  local right_dashes_right = right_half - left_dashes_right - #curr_label
+
+  local sep_line = string.rep("─", left_dashes) .. orig_label .. string.rep("─", right_dashes_left)
+                   .. "┬"
+                   .. string.rep("─", left_dashes_right) .. curr_label .. string.rep("─", right_dashes_right)
+
+  table.insert(lines, sep_line)
+  local sep_line_idx = #lines - 1
+
+  table.insert(highlights, {
+    line = sep_line_idx,
+    col_start = 0,
+    col_end = #sep_line,
+    hl_group = "FloatBorder",
+  })
+
+  -- Preview row (same as grid mode)
+  local original_hex = state.original.color
+  local current_hex = state.current.color
+  local orig_alpha = state.original_alpha or 100
+  local curr_alpha = state.alpha or 100
+
+  local orig_char = Preview.get_alpha_char(orig_alpha)
+  local curr_char = Preview.get_alpha_char(curr_alpha)
+
+  local orig_hl = "NvimColorPickerMiniOriginal"
+  local curr_hl = "NvimColorPickerMiniCurrent"
+  vim.api.nvim_set_hl(0, orig_hl, { fg = original_hex })
+  vim.api.nvim_set_hl(0, curr_hl, { fg = current_hex })
+
+  local left_block_width = half_width
+  local right_block_width = width - half_width - 1
+  local divider = "│"
+
+  local preview_line = string.rep(orig_char, left_block_width)
+                       .. divider
+                       .. string.rep(curr_char, right_block_width)
+
+  table.insert(lines, preview_line)
+  local preview_line_idx = #lines - 1
+
+  local orig_char_bytes = #orig_char
+  local curr_char_bytes = #curr_char
+  local divider_bytes = #divider
+
+  local left_block_bytes = left_block_width * orig_char_bytes
+  local right_block_bytes = right_block_width * curr_char_bytes
+
+  table.insert(highlights, {
+    line = preview_line_idx,
+    col_start = 0,
+    col_end = left_block_bytes,
+    hl_group = orig_hl,
+  })
+  table.insert(highlights, {
+    line = preview_line_idx,
+    col_start = left_block_bytes,
+    col_end = left_block_bytes + divider_bytes,
+    hl_group = "FloatBorder",
+  })
+  table.insert(highlights, {
+    line = preview_line_idx,
+    col_start = left_block_bytes + divider_bytes,
+    col_end = left_block_bytes + divider_bytes + right_block_bytes,
+    hl_group = curr_hl,
+  })
+
+  return lines, highlights
+end
+
 -- ============================================================================
 -- Window Management
 -- ============================================================================
@@ -267,7 +428,13 @@ local function render()
   local inner_width = win_config.width
   local inner_height = win_config.height
 
-  local lines, highlights = render_content(inner_width, inner_height)
+  -- Render based on mode (grid or sliders)
+  local lines, highlights
+  if slider_mode then
+    lines, highlights = render_sliders_content(inner_width, inner_height)
+  else
+    lines, highlights = render_content(inner_width, inner_height)
+  end
 
   -- Update buffer content
   vim.api.nvim_buf_set_option(mini_float.bufnr, 'modifiable', true)
@@ -305,6 +472,55 @@ local function schedule_render()
 end
 
 -- ============================================================================
+-- Slider Navigation (for slider mode)
+-- ============================================================================
+
+---Move slider focus up
+local function slider_focus_up()
+  local state = State.state
+  if not state then return end
+
+  local components = Slider.get_components(state.color_mode, state.alpha_enabled)
+  local count = #components
+
+  slider_focus = slider_focus - 1
+  if slider_focus < 1 then
+    slider_focus = count  -- Wrap to bottom
+  end
+
+  schedule_render()
+end
+
+---Move slider focus down
+local function slider_focus_down()
+  local state = State.state
+  if not state then return end
+
+  local components = Slider.get_components(state.color_mode, state.alpha_enabled)
+  local count = #components
+
+  slider_focus = slider_focus + 1
+  if slider_focus > count then
+    slider_focus = 1  -- Wrap to top
+  end
+
+  schedule_render()
+end
+
+---Adjust the focused slider
+---@param delta number Positive or negative delta
+local function adjust_focused_slider(delta)
+  Slider.adjust_component(slider_focus, delta, schedule_render)
+end
+
+---Toggle between grid and slider mode
+local function toggle_slider_mode()
+  slider_mode = not slider_mode
+  slider_focus = 1  -- Reset focus when toggling
+  schedule_render()
+end
+
+-- ============================================================================
 -- Public API
 -- ============================================================================
 
@@ -317,6 +533,10 @@ function M.close()
   end
 
   State.clear_state()
+
+  -- Reset module state
+  slider_mode = false
+  slider_focus = 1
 
   if mini_float and mini_float:is_valid() then
     mini_float:close()
@@ -347,23 +567,41 @@ function M.pick(opts)
   local width = math.max(MIN_WIDTH, math.floor(ui.width * WIDTH_RATIO))
   local height = math.max(MIN_HEIGHT, math.floor(ui.height * HEIGHT_RATIO))
 
-  -- Calculate cursor-relative position
+  -- Calculate cursor's actual screen position
+  -- vim.fn.screenpos() returns the true screen coordinates of the cursor
   local cursor_pos = vim.api.nvim_win_get_cursor(0)
-  local win_pos = vim.api.nvim_win_get_position(0)
-  local cursor_screen_row = win_pos[1] + cursor_pos[1]
-  local cursor_screen_col = win_pos[2] + cursor_pos[2]
+  local screen_pos = vim.fn.screenpos(0, cursor_pos[1], cursor_pos[2] + 1)
+  local cursor_screen_row = screen_pos.row
+  local cursor_screen_col = screen_pos.col
 
-  -- Smart positioning: prefer below-right, but adjust if near edges
-  local row = 1  -- Below cursor
-  local col = 1  -- Right of cursor
+  -- Smart positioning: prefer below cursor, but go above if not enough room below
+  -- Account for window height + 2 for border + 1 for gap
+  local total_height = height + 3
+  local row, col
 
-  -- Check if window would go off bottom
-  if cursor_screen_row + height + 3 > ui.height then
-    row = -height - 1  -- Above cursor
+  -- Check if there's room below the cursor
+  local room_below = ui.height - cursor_screen_row
+  local room_above = cursor_screen_row - 1
+
+  if room_below >= total_height then
+    -- Position below cursor with 1 row gap
+    row = 2
+  elseif room_above >= total_height then
+    -- Position above cursor with 1 row gap (negative offset from cursor)
+    row = -height - 3
+  elseif room_below >= room_above then
+    -- More room below, position there even if it might clip
+    row = 2
+  else
+    -- More room above, position there even if it might clip
+    row = -height - 3
   end
 
-  -- Check if window would go off right
-  if cursor_screen_col + width + 2 > ui.width then
+  -- Horizontal positioning: prefer right of cursor, go left if not enough room
+  local room_right = ui.width - cursor_screen_col
+  if room_right >= width + 2 then
+    col = 1  -- Right of cursor
+  else
     col = -width - 1  -- Left of cursor
   end
 
@@ -416,7 +654,7 @@ function M.pick(opts)
   -- Build keymaps using config
   local keymaps = {}
 
-  -- Navigation keymaps
+  -- Navigation keymaps (j/k behave differently in slider mode)
   keymaps[get_key("nav_left", "h")] = function()
     local count = vim.v.count1
     Navigation.shift_hue(-count, schedule_render)
@@ -426,12 +664,20 @@ function M.pick(opts)
     Navigation.shift_hue(count, schedule_render)
   end
   keymaps[get_key("nav_up", "k")] = function()
-    local count = vim.v.count1
-    Navigation.shift_lightness(count, schedule_render)
+    if slider_mode then
+      slider_focus_up()
+    else
+      local count = vim.v.count1
+      Navigation.shift_lightness(count, schedule_render)
+    end
   end
   keymaps[get_key("nav_down", "j")] = function()
-    local count = vim.v.count1
-    Navigation.shift_lightness(-count, schedule_render)
+    if slider_mode then
+      slider_focus_down()
+    else
+      local count = vim.v.count1
+      Navigation.shift_lightness(-count, schedule_render)
+    end
   end
   keymaps[get_key("sat_up", "K")] = function()
     local count = vim.v.count1
@@ -442,20 +688,35 @@ function M.pick(opts)
     Navigation.shift_saturation(-count, schedule_render)
   end
 
-  -- Step size keymaps
+  -- Step size keymaps (adjust focused slider in slider mode, step size in grid mode)
   keymaps[get_key("step_down", "-")] = function()
-    State.decrease_step_size(schedule_render)
+    if slider_mode then
+      local count = vim.v.count1
+      adjust_focused_slider(-count)
+    else
+      State.decrease_step_size(schedule_render)
+    end
   end
   local step_up_keys = get_key("step_up", { "+", "=" })
   if type(step_up_keys) == "table" then
     for _, k in ipairs(step_up_keys) do
       keymaps[k] = function()
-        State.increase_step_size(schedule_render)
+        if slider_mode then
+          local count = vim.v.count1
+          adjust_focused_slider(count)
+        else
+          State.increase_step_size(schedule_render)
+        end
       end
     end
   else
     keymaps[step_up_keys] = function()
-      State.increase_step_size(schedule_render)
+      if slider_mode then
+        local count = vim.v.count1
+        adjust_focused_slider(count)
+      else
+        State.increase_step_size(schedule_render)
+      end
     end
   end
 
@@ -503,6 +764,9 @@ function M.pick(opts)
       Navigation.adjust_alpha(count, schedule_render)
     end
   end
+
+  -- Slider mode toggle
+  keymaps["s"] = toggle_slider_mode
 
   -- Build controls definition with resolved keymaps
   local controls = build_controls_definition({
@@ -553,6 +817,24 @@ function M.pick(opts)
 
   -- Initial render
   render()
+end
+
+---Open the mini color picker in slider mode
+---@param opts table Options (same as pick)
+function M.pick_slider(opts)
+  -- First open normally
+  M.pick(opts)
+
+  -- Then switch to slider mode
+  slider_mode = true
+  slider_focus = 1
+  schedule_render()
+end
+
+---Check if currently in slider mode
+---@return boolean
+function M.is_slider_mode()
+  return slider_mode
 end
 
 return M

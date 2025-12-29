@@ -99,6 +99,8 @@ function M.init_state(initial, options, grid_width, grid_height, preview_rows, n
     presets_cursor = 1,
     presets_expanded = {},
     presets_search = "",
+    -- Slider state
+    slider_focus = 1,  -- Which slider is focused (1-indexed)
   }
 
   -- Initialize custom control values from defaults

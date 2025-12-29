@@ -17,6 +17,14 @@ local function get_presets_tab()
   return require('nvim-colorpicker.picker.presets_tab')
 end
 
+local function get_info_tab()
+  return require('nvim-colorpicker.picker.info_tab')
+end
+
+local function get_slider()
+  return require('nvim-colorpicker.picker.slider')
+end
+
 -- ============================================================================
 -- Controls Definition (for UiFloat help popup)
 -- ============================================================================
@@ -27,7 +35,7 @@ function M.get_controls_definition()
   local state = State.state
   local controls = {
     {
-      header = "Navigation",
+      header = "Grid Navigation",
       keys = {
         { key = "h / l", desc = "Move hue (left/right)" },
         { key = "j / k", desc = "Adjust lightness (down/up)" },
@@ -36,9 +44,16 @@ function M.get_controls_definition()
       }
     },
     {
+      header = "Info Panel",
+      keys = {
+        { key = "j / k", desc = "Focus slider row" },
+        { key = "- / +", desc = "Adjust focused slider" },
+      }
+    },
+    {
       header = "Step Size",
       keys = {
-        { key = "- / +", desc = "Decrease/increase multiplier" },
+        { key = "- / +", desc = "Decrease/increase multiplier (grid)" },
       }
     },
     {
@@ -377,6 +392,143 @@ function M.clear_presets_keymaps(multi)
   if presets_cursor_autocmd then
     pcall(vim.api.nvim_del_autocmd, presets_cursor_autocmd)
     presets_cursor_autocmd = nil
+  end
+end
+
+-- ============================================================================
+-- Info Tab (Sliders) Keymaps
+-- ============================================================================
+
+-- Autocmd ID for info CursorMoved handler
+local info_cursor_autocmd = nil
+
+---Setup info-tab-specific keymaps when info tab is active (for slider adjustment)
+---@param multi MultiPanelState
+---@param schedule_render fun() Function to schedule a render
+function M.setup_info_keymaps(multi, schedule_render)
+  local state = State.state
+  if not state then return end
+
+  local cfg = state._keymaps or Config.get_keymaps()
+  local Slider = get_slider()
+  local InfoTab = get_info_tab()
+
+  local info_keymaps = {}
+  local Navigation = require('nvim-colorpicker.picker.navigation')
+
+  -- Helper to get info window and cursor
+  local function get_cursor_info()
+    local info_win = multi:get_panel_window("info")
+    local cursor_pos = info_win and vim.api.nvim_win_is_valid(info_win) and vim.api.nvim_win_get_cursor(info_win)
+    return info_win, cursor_pos
+  end
+
+  -- Helper to restore cursor after render
+  local function restore_cursor_after_render(info_win, cursor_pos)
+    vim.schedule(function()
+      if cursor_pos and info_win and vim.api.nvim_win_is_valid(info_win) then
+        pcall(vim.api.nvim_win_set_cursor, info_win, cursor_pos)
+      end
+    end)
+  end
+
+  -- Wrapper to adjust slider and restore cursor position
+  local function adjust_and_restore(delta)
+    local count = vim.v.count1
+    local info_win, cursor_pos = get_cursor_info()
+
+    Slider.adjust_component(state.slider_focus, delta * count, function()
+      schedule_render()
+      restore_cursor_after_render(info_win, cursor_pos)
+    end)
+  end
+
+  -- Wrapper for actions that trigger re-render (format toggle, mode cycle)
+  local function action_and_restore(action_fn)
+    local info_win, cursor_pos = get_cursor_info()
+    action_fn()
+    restore_cursor_after_render(info_win, cursor_pos)
+  end
+
+  -- Step adjustment keys adjust the focused slider component
+  local step_down_key = cfg.step_down or "-"
+  local step_up_keys = cfg.step_up or { "+", "=" }
+
+  -- Decrease component value
+  if type(step_down_key) == "table" then
+    for _, k in ipairs(step_down_key) do
+      info_keymaps[k] = function()
+        adjust_and_restore(-1)
+      end
+    end
+  else
+    info_keymaps[step_down_key] = function()
+      adjust_and_restore(-1)
+    end
+  end
+
+  -- Increase component value
+  if type(step_up_keys) == "table" then
+    for _, k in ipairs(step_up_keys) do
+      info_keymaps[k] = function()
+        adjust_and_restore(1)
+      end
+    end
+  else
+    info_keymaps[step_up_keys] = function()
+      adjust_and_restore(1)
+    end
+  end
+
+  -- Format toggle with cursor preservation
+  local format_key = cfg.cycle_format or "f"
+  info_keymaps[format_key] = function()
+    action_and_restore(function()
+      Navigation.cycle_format(schedule_render)
+    end)
+  end
+
+  -- Mode cycle with cursor preservation
+  local mode_key = cfg.cycle_mode or "m"
+  info_keymaps[mode_key] = function()
+    action_and_restore(function()
+      Navigation.cycle_mode(schedule_render)
+    end)
+  end
+
+  -- Apply these keymaps to the info panel
+  multi:set_panel_keymaps("info", info_keymaps)
+
+  -- Setup CursorMoved autocmd for info panel to sync slider focus with cursor
+  local info_buf = multi:get_panel_buffer("info")
+  local info_win = multi:get_panel_window("info")
+  if info_buf and vim.api.nvim_buf_is_valid(info_buf) then
+    -- Clean up any existing autocmd
+    if info_cursor_autocmd then
+      pcall(vim.api.nvim_del_autocmd, info_cursor_autocmd)
+    end
+
+    info_cursor_autocmd = vim.api.nvim_create_autocmd("CursorMoved", {
+      buffer = info_buf,
+      callback = function()
+        InfoTab.on_cursor_moved()
+      end,
+    })
+
+    -- Restore cursor position to focused slider
+    InfoTab.restore_cursor(info_win)
+  end
+end
+
+---Clear info-specific keymaps (when switching away from info tab)
+---@param multi MultiPanelState
+function M.clear_info_keymaps(multi)
+  multi:set_panel_keymaps("info", {})
+
+  -- Clean up CursorMoved autocmd
+  if info_cursor_autocmd then
+    pcall(vim.api.nvim_del_autocmd, info_cursor_autocmd)
+    info_cursor_autocmd = nil
   end
 end
 

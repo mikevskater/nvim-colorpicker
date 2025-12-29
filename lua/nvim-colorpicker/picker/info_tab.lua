@@ -4,6 +4,7 @@
 local State = require('nvim-colorpicker.picker.state')
 local ColorUtils = require('nvim-colorpicker.color')
 local Format = require('nvim-colorpicker.picker.format')
+local Slider = require('nvim-colorpicker.picker.slider')
 local ContentBuilder = require('nvim-float.content_builder')
 
 local M = {}
@@ -42,21 +43,37 @@ function M.render_info_content(cb)
 
   cb:blank()
 
-  local components = ColorUtils.get_color_components(current_hex, state.color_mode)
-  for _, comp in ipairs(components) do
-    local formatted = ColorUtils.format_value(comp.value, comp.unit, state.value_format)
-    cb:spans({
-      { text = "  " .. comp.label .. ": ", style = "label" },
-      { text = formatted, style = "value" },
-    })
+  -- Render sliders instead of static values
+  local components = Slider.get_components(state.color_mode, state.alpha_enabled)
+  local values = Slider.get_component_values(current_hex, state.color_mode, state.alpha)
+  local slider_focus = state.slider_focus or 1
+
+  -- Track the content line where sliders start (will be adjusted by tab bar offset later)
+  -- Content lines before sliders: blank(1) + Mode(1) + blank(1) + Hex(1) + blank(1) + sep(1) + blank(1) = 7
+  M._slider_content_offset = 7
+
+  -- Helper to pad based on display width (handles multi-byte chars like °)
+  local function pad_display(str, width)
+    local display_width = vim.fn.strdisplaywidth(str)
+    local padding = math.max(0, width - display_width)
+    return string.rep(" ", padding) .. str
   end
 
-  if state.alpha_enabled and state.color_mode ~= "cmyk" then
-    cb:blank()
-    local alpha_formatted = ColorUtils.format_value(state.alpha, "pct", state.value_format)
+  for i, comp in ipairs(components) do
+    local value = values[comp.key] or 0
+    local slider_str = Slider.render_slider(value, comp.min, comp.max, 14)
+    local formatted = ColorUtils.format_value(value, comp.unit, state.value_format)
+    local value_padded = pad_display(formatted, 5)
+
+    -- Highlight focused slider
+    local is_focused = (i == slider_focus) and state.focused_panel == "info"
+    local label_style = is_focused and "emphasis" or "label"
+    local slider_style = is_focused and "emphasis" or "value"
+
     cb:spans({
-      { text = "  A: ", style = "label" },
-      { text = alpha_formatted, style = "value" },
+      { text = "  " .. comp.label .. ": ", style = label_style },
+      { text = slider_str, style = slider_style },
+      { text = " " .. value_padded, style = "value" },
     })
   end
 
@@ -151,6 +168,12 @@ function M.render_info_panel(multi_state)
   local cb = ContentBuilder.new()
   M.render_info_content(cb)
 
+  -- Calculate slider start line: tab_bar_lines + content_offset
+  -- Cursor is 1-indexed, so first slider at line (line_offset + _slider_content_offset + 1)
+  -- For get_slider_from_cursor: slider_line = cursor - _slider_start_line, should give 1 for first slider
+  -- So _slider_start_line = line_offset + _slider_content_offset
+  M._slider_start_line = line_offset + (M._slider_content_offset or 7)
+
   local content_lines = cb:build_lines()
   local content_highlights = cb:build_highlights()
 
@@ -167,6 +190,66 @@ function M.render_info_panel(multi_state)
   end
 
   return all_lines, all_highlights
+end
+
+-- ============================================================================
+-- Slider Cursor Tracking
+-- ============================================================================
+
+-- Line offset where sliders start (set during render)
+M._slider_start_line = 10  -- Default, updated during render
+M._slider_content_offset = 7  -- Lines in content before first slider
+
+---Get the slider index from cursor position
+---@param cursor_line number 1-indexed cursor line
+---@return number? slider_index 1-indexed slider index, or nil if not on a slider
+function M.get_slider_from_cursor(cursor_line)
+  local state = State.state
+  if not state then return nil end
+
+  local components = Slider.get_components(state.color_mode, state.alpha_enabled)
+  local slider_count = #components
+
+  -- Calculate which slider the cursor is on
+  local slider_line = cursor_line - M._slider_start_line
+  if slider_line >= 1 and slider_line <= slider_count then
+    return slider_line
+  end
+
+  return nil
+end
+
+---Called when cursor moves in info panel
+function M.on_cursor_moved()
+  local state = State.state
+  if not state or state.active_tab ~= "info" then return end
+
+  local cursor = vim.api.nvim_win_get_cursor(0)
+  local line = cursor[1]
+
+  local slider_idx = M.get_slider_from_cursor(line)
+  if slider_idx then
+    state.slider_focus = slider_idx
+  end
+end
+
+---Get the line number for a slider index
+---@param slider_index number 1-indexed slider index
+---@return number line 1-indexed line number
+function M.get_line_for_slider(slider_index)
+  return M._slider_start_line + slider_index - 1
+end
+
+---Restore cursor to the focused slider
+---@param win number Window handle
+function M.restore_cursor(win)
+  local state = State.state
+  if not state or not win or not vim.api.nvim_win_is_valid(win) then return end
+
+  local slider_focus = state.slider_focus or 1
+  local line = M.get_line_for_slider(slider_focus)
+
+  pcall(vim.api.nvim_win_set_cursor, win, { line, 0 })
 end
 
 return M
