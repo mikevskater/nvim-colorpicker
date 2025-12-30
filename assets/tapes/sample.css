@@ -1,0 +1,42 @@
+/* Sample CSS for nvim-colorpicker demos */
+
+:root {
+  --primary: #3b82f6;
+  --secondary: #8b5cf6;
+  --accent: #f59e0b;
+  --success: #10b981;
+  --error: #ef4444;
+  --background: #1e1e2e;
+  --foreground: #cdd6f4;
+}
+
+.button {
+  background-color: #3b82f6;
+  color: #ffffff;
+  border: 1px solid #2563eb;
+  border-radius: 8px;
+}
+
+.button:hover {
+  background-color: #2563eb;
+}
+
+.card {
+  background: #313244;
+  border: 1px solid #45475a;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.alert-warning {
+  background-color: #fbbf24;
+  color: #1e1e2e;
+}
+
+.alert-error {
+  background-color: #ef4444;
+  color: #ffffff;
+}
+
+.gradient {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
