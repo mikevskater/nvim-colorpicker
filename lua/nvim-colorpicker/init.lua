@@ -28,7 +28,7 @@
 local M = {}
 
 ---Plugin version
-M.version = '1.9.9'
+M.version = '2.0.0'
 
 -- Lazy-load modules
 local function get_config()
