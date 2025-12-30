@@ -41,9 +41,9 @@ function M.apply(close_fn)
   local result = M.build_result()
   local on_select = state.options.on_select
 
-  -- Add selected color to history
+  -- Add selected color to history (with alpha)
   if result.color then
-    History.add_recent(result.color)
+    History.add_recent(result.color, result.alpha)
   end
 
   -- Close the picker

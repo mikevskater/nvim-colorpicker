@@ -9,6 +9,23 @@ local ContentBuilder = require('nvim-float.content_builder')
 local M = {}
 
 -- ============================================================================
+-- Constants
+-- ============================================================================
+
+---@type string Swatch characters (same block char as grid)
+local SWATCH_TEXT = "██"
+
+-- ============================================================================
+-- Extmark Namespace
+-- ============================================================================
+
+---@type number Namespace for swatch extmarks
+local ns = vim.api.nvim_create_namespace('nvim_colorpicker_preset_swatches')
+
+---@type table[] Pending extmarks to apply after render
+local pending_extmarks = {}
+
+-- ============================================================================
 -- Swatch Highlight Management
 -- ============================================================================
 
@@ -23,7 +40,9 @@ local function get_swatch_highlight(hex)
   local hl_name = "NvimColorPickerPreset_" .. hex:gsub("#", "")
 
   if not created_highlights[hl_name] then
-    vim.api.nvim_set_hl(0, hl_name, { bg = hex })
+    -- Use fg color for block chars (VHS compatible)
+    -- Note: bg would fill entire row, so we only use fg
+    vim.api.nvim_set_hl(0, hl_name, { fg = hex })
     created_highlights[hl_name] = true
   end
 
@@ -317,7 +336,11 @@ function M.render_presets_content(cb)
 
   local items = build_flat_items(state.presets_search)
 
+  -- Track line index for extmarks (starts after tab bar: 3 lines)
+  local line_idx = 3
+
   cb:blank()
+  line_idx = line_idx + 1
 
   -- Search indicator if active
   if state.presets_search and state.presets_search ~= "" then
@@ -325,7 +348,9 @@ function M.render_presets_content(cb)
       { text = "  Search: ", style = "muted" },
       { text = state.presets_search, style = "value" },
     })
+    line_idx = line_idx + 1
     cb:blank()
+    line_idx = line_idx + 1
   end
 
   if #items == 0 then
@@ -334,6 +359,9 @@ function M.render_presets_content(cb)
       cb:styled("  Try a different search", "muted")
     end
   else
+    -- Clear pending extmarks
+    pending_extmarks = {}
+
     -- Calculate max color name length for alignment
     local max_name_len = 0
     for _, item in ipairs(items) do
@@ -350,23 +378,30 @@ function M.render_presets_content(cb)
         local expand_char = item.expanded and "v" or ">"
         cb:styled(string.format("  %s%s %s (%d)",
           indent, expand_char, item.preset_name, item.count), "header")
+        line_idx = line_idx + 1
 
       elseif item.type == "group" then
         local expand_char = item.expanded and "v" or ">"
         cb:styled(string.format("  %s%s %s (%d)",
           indent, expand_char, item.group_name, item.count), "value")
+        line_idx = line_idx + 1
 
       elseif item.type == "color" then
-        local swatch_hl = get_swatch_highlight(item.hex)
         -- Pad color name to align swatches
         local padded_name = item.color_name .. string.rep(" ", max_name_len - #item.color_name)
 
+        -- Render WITHOUT swatch (swatch added via extmark)
         cb:spans({
           { text = string.format("  %s", indent), style = "normal" },
           { text = padded_name, style = "normal" },
-          { text = " ", style = "normal" },
-          { text = "  ", hl_group = swatch_hl },
         })
+
+        -- Store extmark data for this line
+        table.insert(pending_extmarks, {
+          line = line_idx,
+          hex = item.hex,
+        })
+        line_idx = line_idx + 1
       end
     end
   end
@@ -427,6 +462,34 @@ function M.render_presets_panel(multi_state)
   end
 
   return all_lines, all_highlights
+end
+
+---Apply swatch extmarks to the info panel buffer
+---Called after the buffer content is set to add virtual text swatches
+---@param bufnr number The buffer number to apply extmarks to
+function M.apply_swatch_extmarks(bufnr)
+  if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then return end
+
+  -- Clear previous extmarks
+  vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
+
+  -- Apply pending extmarks as virtual text (cursor-highlight resistant)
+  for _, extmark in ipairs(pending_extmarks) do
+    local hl_name = get_swatch_highlight(extmark.hex)
+
+    vim.api.nvim_buf_set_extmark(bufnr, ns, extmark.line, 0, {
+      virt_text = { { " " .. SWATCH_TEXT, hl_name } },
+      virt_text_pos = "eol",  -- End of line
+    })
+  end
+end
+
+---Clear swatch extmarks from buffer
+---@param bufnr number The buffer number
+function M.clear_swatch_extmarks(bufnr)
+  if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+    vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
+  end
 end
 
 return M

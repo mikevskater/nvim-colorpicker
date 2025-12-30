@@ -6,10 +6,18 @@ local M = {}
 local utils = require('nvim-colorpicker.color')
 
 -- ============================================================================
+-- Types
+-- ============================================================================
+
+---@class HistoryItem
+---@field hex string Hex color value
+---@field alpha number Alpha value (0-100 percentage)
+
+-- ============================================================================
 -- State
 -- ============================================================================
 
----@type string[] Recent colors (most recent first)
+---@type HistoryItem[] Recent colors (most recent first)
 local recent_colors = {}
 
 ---@type number Maximum colors to track
@@ -21,20 +29,25 @@ local max_recent = 10
 
 ---Add a color to recent history
 ---@param hex string Hex color
-function M.add_recent(hex)
+---@param alpha number? Alpha value (0-100 percentage, default: 100)
+function M.add_recent(hex, alpha)
   if not hex or not utils.is_valid_hex(hex) then return end
 
   hex = utils.normalize_hex(hex)
+  alpha = alpha or 100
 
   -- Remove if already exists (to move to front)
   for i = #recent_colors, 1, -1 do
-    if recent_colors[i] == hex then
+    local item = recent_colors[i]
+    -- Handle both old string format and new table format
+    local item_hex = type(item) == "table" and item.hex or item
+    if item_hex == hex then
       table.remove(recent_colors, i)
     end
   end
 
-  -- Add to front
-  table.insert(recent_colors, 1, hex)
+  -- Add to front as table with hex and alpha
+  table.insert(recent_colors, 1, { hex = hex, alpha = alpha })
 
   -- Trim to max size
   while #recent_colors > max_recent do
@@ -42,14 +55,32 @@ function M.add_recent(hex)
   end
 end
 
----Get recent colors
+---Get recent colors with alpha values
 ---@param count number? Maximum colors to return (default: all)
----@return string[] colors Recent hex colors (most recent first)
+---@return HistoryItem[] items Recent colors with alpha (most recent first)
 function M.get_recent(count)
   count = count or #recent_colors
   local result = {}
   for i = 1, math.min(count, #recent_colors) do
-    table.insert(result, recent_colors[i])
+    local item = recent_colors[i]
+    -- Handle both old string format and new table format for backwards compatibility
+    if type(item) == "string" then
+      table.insert(result, { hex = item, alpha = 100 })
+    else
+      table.insert(result, item)
+    end
+  end
+  return result
+end
+
+---Get recent hex colors only (convenience method)
+---@param count number? Maximum colors to return (default: all)
+---@return string[] colors Recent hex colors (most recent first)
+function M.get_recent_hex(count)
+  local items = M.get_recent(count)
+  local result = {}
+  for _, item in ipairs(items) do
+    table.insert(result, item.hex)
   end
   return result
 end
@@ -157,7 +188,15 @@ end
 ---@param data table
 function M.restore_persist_data(data)
   if data and data.recent then
-    recent_colors = data.recent
+    -- Convert old string format to new table format if needed
+    recent_colors = {}
+    for _, item in ipairs(data.recent) do
+      if type(item) == "string" then
+        table.insert(recent_colors, { hex = item, alpha = 100 })
+      else
+        table.insert(recent_colors, item)
+      end
+    end
     -- Trim to max
     while #recent_colors > max_recent do
       table.remove(recent_colors)

@@ -15,6 +15,19 @@ local M = {}
 ---@type number Maximum history items to display
 local MAX_DISPLAY_ITEMS = 10
 
+---@type string Swatch characters (same block char as grid, multiple wide)
+local SWATCH_TEXT = "█████"
+
+-- ============================================================================
+-- Extmark Namespace
+-- ============================================================================
+
+---@type number Namespace for swatch extmarks
+local ns = vim.api.nvim_create_namespace('nvim_colorpicker_history_swatches')
+
+---@type table[] Pending extmarks to apply after render
+local pending_extmarks = {}
+
 -- ============================================================================
 -- History Highlight Management
 -- ============================================================================
@@ -32,8 +45,9 @@ local function get_swatch_highlight(hex)
 
   -- Only create if not already cached
   if not created_highlights[hl_name] then
-    -- Use bg color for spaces (consistent with grid rendering)
-    vim.api.nvim_set_hl(0, hl_name, { bg = hex })
+    -- Use fg color for block chars (VHS compatible)
+    -- Note: bg would fill entire row, so we only use fg
+    vim.api.nvim_set_hl(0, hl_name, { fg = hex })
     created_highlights[hl_name] = true
   end
 
@@ -117,12 +131,17 @@ function M.select_current(schedule_render)
   local history = History.get_recent(MAX_DISPLAY_ITEMS)
   if #history == 0 then return end
 
-  local selected_hex = history[state.history_cursor]
-  if selected_hex then
-    State.set_active_color(selected_hex)
+  local selected_item = history[state.history_cursor]
+  if selected_item then
+    State.set_active_color(selected_item.hex)
+
+    -- Restore alpha from history
+    if selected_item.alpha then
+      state.alpha = selected_item.alpha
+    end
 
     -- Update saved HSL for proper grid navigation
-    local h, s, _ = ColorUtils.hex_to_hsl(selected_hex)
+    local h, s, _ = ColorUtils.hex_to_hsl(selected_item.hex)
     state.saved_hsl = { h = h, s = s }
     state.lightness_virtual = nil
     state.saturation_virtual = nil
@@ -140,23 +159,23 @@ function M.delete_current(schedule_render)
   local history = History.get_recent(MAX_DISPLAY_ITEMS)
   if #history == 0 then return end
 
-  -- Get the color to delete
+  -- Get the item to delete
   local to_delete = history[state.history_cursor]
   if not to_delete then return end
 
-  -- Get all colors and remove the selected one
+  -- Get all colors and remove the selected one (compare by hex)
   local all_colors = History.get_recent()
   local new_colors = {}
-  for _, color in ipairs(all_colors) do
-    if color ~= to_delete then
-      table.insert(new_colors, color)
+  for _, item in ipairs(all_colors) do
+    if item.hex ~= to_delete.hex then
+      table.insert(new_colors, item)
     end
   end
 
   -- Clear and re-add remaining colors (in reverse to maintain order)
   History.clear_recent()
   for i = #new_colors, 1, -1 do
-    History.add_recent(new_colors[i])
+    History.add_recent(new_colors[i].hex, new_colors[i].alpha)
   end
 
   -- Adjust cursor if needed
@@ -192,7 +211,11 @@ function M.render_history_content(cb)
 
   local history = History.get_recent(MAX_DISPLAY_ITEMS)
 
+  -- Track line index for extmarks (starts after tab bar: 3 lines)
+  local line_idx = 3
+
   cb:blank()
+  line_idx = line_idx + 1
 
   if #history == 0 then
     cb:styled("  No recent colors", "muted")
@@ -201,21 +224,44 @@ function M.render_history_content(cb)
     cb:styled("  them to history.", "muted")
   else
     cb:styled(string.format("  Recent (%d)", #history), "header")
+    line_idx = line_idx + 1
     cb:blank()
+    line_idx = line_idx + 1
+
+    -- Clear pending extmarks
+    pending_extmarks = {}
+
+    -- Pre-calculate display hex values and find max length for alignment
+    local display_items = {}
+    local max_hex_len = 0
+    for _, item in ipairs(history) do
+      local display_hex = item.hex
+      if item.alpha and item.alpha < 100 then
+        local alpha_byte = math.floor((item.alpha / 100) * 255 + 0.5)
+        display_hex = item.hex .. string.format("%02X", alpha_byte)
+      end
+      table.insert(display_items, display_hex)
+      max_hex_len = math.max(max_hex_len, #display_hex)
+    end
 
     -- Render all items - cursor position is the selection indicator
-    for i, hex in ipairs(history) do
-      -- Create swatch highlight group
-      local swatch_hl = get_swatch_highlight(hex)
+    for i, item in ipairs(history) do
+      -- Pad hex to align swatches
+      local display_hex = display_items[i]
+      local padded_hex = display_hex .. string.rep(" ", max_hex_len - #display_hex)
 
-      -- Build the line using spans with inline swatch highlight
       cb:spans({
         { text = "  ", style = "normal" },
         { text = string.format("%2d ", i), style = "value" },
-        { text = hex, style = "value" },
-        { text = " ", style = "normal" },
-        { text = "     ", hl_group = swatch_hl },  -- 5 spaces with bg color
+        { text = padded_hex, style = "value" },
       })
+
+      -- Store extmark data for this line
+      table.insert(pending_extmarks, {
+        line = line_idx,
+        hex = item.hex,
+      })
+      line_idx = line_idx + 1
     end
   end
 
@@ -277,6 +323,34 @@ function M.render_history_panel(multi_state)
   end
 
   return all_lines, all_highlights
+end
+
+---Apply swatch extmarks to the info panel buffer
+---Called after the buffer content is set to add virtual text swatches
+---@param bufnr number The buffer number to apply extmarks to
+function M.apply_swatch_extmarks(bufnr)
+  if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then return end
+
+  -- Clear previous extmarks
+  vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
+
+  -- Apply pending extmarks as virtual text (cursor-highlight resistant)
+  for _, extmark in ipairs(pending_extmarks) do
+    local hl_name = get_swatch_highlight(extmark.hex)
+
+    vim.api.nvim_buf_set_extmark(bufnr, ns, extmark.line, 0, {
+      virt_text = { { " " .. SWATCH_TEXT, hl_name } },
+      virt_text_pos = "eol",  -- End of line
+    })
+  end
+end
+
+---Clear swatch extmarks from buffer
+---@param bufnr number The buffer number
+function M.clear_swatch_extmarks(bufnr)
+  if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+    vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
+  end
 end
 
 return M
