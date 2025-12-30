@@ -2,7 +2,7 @@
 
 A powerful HSL-based color picker for Neovim with visual grid navigation, multiple picker interfaces, real-time preview and more.
 
-**Version:** 1.9.5
+**Version:** 2.0.0
 
 <p align="center">
   <img src="assets/hero.gif" alt="nvim-colorpicker demo" width="800">
