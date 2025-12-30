@@ -142,26 +142,46 @@ local function render_content(width, height)
     line_offset = 1
   end
 
+  -- Character constants with their byte lengths
+  local BLOCK_CHAR = "█"
+  local BLOCK_CHAR_LEN = #BLOCK_CHAR  -- 3 bytes in UTF-8
+  local CURSOR_CHAR = "x"
+  local CURSOR_CHAR_LEN = #CURSOR_CHAR  -- 1 byte
+
   -- Render grid rows (no padding - edge to edge)
   for row_idx, row in ipairs(grid) do
     local line = ""
+    local row_highlights = {}
+    local byte_pos = 0
+
     for col_idx, _ in ipairs(row) do
+      local char, char_len
       if row_idx == center_row and col_idx == center_col then
-        line = line .. "x"
+        char = CURSOR_CHAR
+        char_len = CURSOR_CHAR_LEN
       else
-        line = line .. " "
+        char = BLOCK_CHAR
+        char_len = BLOCK_CHAR_LEN
       end
+      line = line .. char
+
+      table.insert(row_highlights, {
+        col_start = byte_pos,
+        col_end = byte_pos + char_len,
+        hl_group = Grid.get_cell_hl_group(row_idx, col_idx),
+      })
+
+      byte_pos = byte_pos + char_len
     end
     table.insert(lines, line)
 
     -- Add highlights for each cell
-    for col_idx, _ in ipairs(row) do
-      local hl_name = Grid.get_cell_hl_group(row_idx, col_idx)
+    for _, hl in ipairs(row_highlights) do
       table.insert(highlights, {
         line = row_idx - 1 + line_offset,
-        col_start = col_idx - 1,
-        col_end = col_idx,
-        hl_group = hl_name,
+        col_start = hl.col_start,
+        col_end = hl.col_end,
+        hl_group = hl.hl_group,
       })
     end
   end

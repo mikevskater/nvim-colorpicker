@@ -147,13 +147,15 @@ function M.create_grid_highlights(grid)
       local hl_def
 
       if row_idx == center_row and col_idx == center_col then
+        -- Center cell: use bg color with contrasting fg for cursor marker
         hl_def = {
           fg = ColorUtils.get_contrast_color(color),
           bg = color,
           bold = true,
         }
       else
-        hl_def = { bg = color }
+        -- Non-center cells: use fg color with block character (fixes VHS rendering)
+        hl_def = { fg = color }
       end
 
       vim.api.nvim_set_hl(0, hl_name, hl_def)
@@ -179,22 +181,35 @@ function M.render_grid()
 
   local pad = string.rep(" ", PADDING)
 
+  -- Character constants with their byte lengths
+  local BLOCK_CHAR = "█"
+  local BLOCK_CHAR_LEN = #BLOCK_CHAR  -- 3 bytes in UTF-8
+  local CURSOR_CHAR = "X"
+  local CURSOR_CHAR_LEN = #CURSOR_CHAR  -- 1 byte
+
   for row_idx, row in ipairs(grid) do
     local line_chars = {}
     local line_hls = {}
+    local byte_pos = PADDING  -- Start after padding (spaces are 1 byte each)
 
     for col_idx, _ in ipairs(row) do
-      local char = " "
+      local char, char_len
       if row_idx == center_row and col_idx == center_col then
-        char = "X"
+        char = CURSOR_CHAR
+        char_len = CURSOR_CHAR_LEN
+      else
+        char = BLOCK_CHAR
+        char_len = BLOCK_CHAR_LEN
       end
       table.insert(line_chars, char)
 
       table.insert(line_hls, {
-        col_start = PADDING + col_idx - 1,
-        col_end = PADDING + col_idx,
+        col_start = byte_pos,
+        col_end = byte_pos + char_len,
         hl_group = M.get_cell_hl_group(row_idx, col_idx),
       })
+
+      byte_pos = byte_pos + char_len
     end
 
     local line = pad .. table.concat(line_chars)
