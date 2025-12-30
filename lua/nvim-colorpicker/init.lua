@@ -117,6 +117,20 @@ function M.pick(opts)
   get_picker().pick(opts)
 end
 
+---Map detected format to picker color mode
+---@param format string The detected format type
+---@return string mode The picker color mode
+local function format_to_mode(format)
+  if format == "rgb" then
+    return "rgb"
+  elseif format == "hsl" then
+    return "hsl"
+  else
+    -- hex, hex3, hex8, vim all map to hex mode
+    return "hex"
+  end
+end
+
 ---Detect color at cursor and open picker for replacement
 function M.pick_at_cursor()
   local detect = get_detect()
@@ -131,6 +145,7 @@ function M.pick_at_cursor()
     color = color_info.color,
     alpha_enabled = true,  -- Always allow alpha editing
     initial_alpha = color_info.alpha or 100,  -- Use detected alpha or default to 100
+    forced_mode = format_to_mode(color_info.format),  -- Match picker mode to detected format
     on_select = function(result)
       -- result is {color, alpha} - extract the color
       local new_color = result.color or color_info.color
@@ -225,6 +240,7 @@ function M.pick_mini_at_cursor()
   M.pick_mini({
     color = color_info.color,
     alpha = color_info.alpha or 100,  -- Always enable alpha mode
+    forced_mode = format_to_mode(color_info.format),  -- Match picker mode to detected format
     on_select = function(result)
       local new_color = result.color or color_info.color
       detect.replace_color_at_cursor(new_color, color_info, result.alpha)
@@ -262,6 +278,7 @@ function M.pick_mini_slider_at_cursor()
   M.pick_mini_slider({
     color = color_info.color,
     alpha = color_info.alpha or 100,
+    forced_mode = format_to_mode(color_info.format),  -- Match picker mode to detected format
     on_select = function(result)
       local new_color = result.color or color_info.color
       detect.replace_color_at_cursor(new_color, color_info, result.alpha)
