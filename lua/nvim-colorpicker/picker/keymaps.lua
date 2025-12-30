@@ -66,9 +66,9 @@ function M.get_controls_definition()
     {
       header = "Tabs",
       keys = {
-        { key = "Alt+1", desc = "Info tab" },
-        { key = "Alt+2", desc = "History tab" },
-        { key = "Alt+3", desc = "Presets tab" },
+        { key = "g1", desc = "Info tab" },
+        { key = "g2", desc = "History tab" },
+        { key = "g3", desc = "Presets tab" },
       }
     },
     {
@@ -234,14 +234,14 @@ function M.setup_multipanel_keymaps(multi, schedule_render, apply, cancel)
     end
   end
 
-  -- Tab switching keymaps (Alt+number to preserve count prefixes)
-  common_keymaps["<A-1>"] = function()
+  -- Tab switching keymaps (g+number for VHS compatibility)
+  common_keymaps["g1"] = function()
     Tabs.switch_tab("info", schedule_render)
   end
-  common_keymaps["<A-2>"] = function()
+  common_keymaps["g2"] = function()
     Tabs.switch_tab("history", schedule_render)
   end
-  common_keymaps["<A-3>"] = function()
+  common_keymaps["g3"] = function()
     Tabs.switch_tab("presets", schedule_render)
   end
 
@@ -287,6 +287,9 @@ function M.setup_history_keymaps(multi, schedule_render)
   local info_buf = multi:get_panel_buffer("info")
   local info_win = multi:get_panel_window("info")
   if info_buf and vim.api.nvim_buf_is_valid(info_buf) then
+    -- Apply swatch extmarks (virtual text, cursor-highlight resistant)
+    HistoryTab.apply_swatch_extmarks(info_buf)
+
     -- Clean up any existing autocmd
     if history_cursor_autocmd then
       pcall(vim.api.nvim_del_autocmd, history_cursor_autocmd)
@@ -366,6 +369,9 @@ function M.setup_presets_keymaps(multi, schedule_render)
   local info_buf = multi:get_panel_buffer("info")
   local info_win = multi:get_panel_window("info")
   if info_buf and vim.api.nvim_buf_is_valid(info_buf) then
+    -- Apply swatch extmarks (virtual text, cursor-highlight resistant)
+    PresetsTab.apply_swatch_extmarks(info_buf)
+
     -- Clean up any existing autocmd
     if presets_cursor_autocmd then
       pcall(vim.api.nvim_del_autocmd, presets_cursor_autocmd)

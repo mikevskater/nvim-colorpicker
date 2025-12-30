@@ -159,7 +159,10 @@ function M.convert_at_cursor(format)
 
   local converted = utils.convert_format(color_info.color, format)
   if converted then
-    detect.replace_color_at_cursor(converted, color_info)
+    -- Direct replacement (don't use replace_color_at_cursor which re-formats)
+    local line = vim.api.nvim_get_current_line()
+    local new_line = line:sub(1, color_info.start_col) .. converted .. line:sub(color_info.end_col + 1)
+    vim.api.nvim_set_current_line(new_line)
   end
 end
 

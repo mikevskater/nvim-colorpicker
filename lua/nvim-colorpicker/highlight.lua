@@ -29,13 +29,8 @@ local highlight_mode = "background"
 local function get_or_create_hl(hex)
   local hl_name = "NvimColorPicker_" .. hex:gsub("#", "")
 
-  -- Check if already exists
-  local ok, hl = pcall(vim.api.nvim_get_hl, 0, { name = hl_name })
-  if ok and hl and (hl.bg or hl.fg) then
-    return hl_name
-  end
-
-  -- Create highlight
+  -- Always recreate highlight to ensure correct mode
+  -- (caching could cause issues when mode changes)
   if highlight_mode == "background" then
     local fg = utils.get_contrast_color(hex)
     vim.api.nvim_set_hl(0, hl_name, { bg = hex, fg = fg })
