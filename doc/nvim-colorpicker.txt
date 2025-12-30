@@ -1,0 +1,627 @@
+*nvim-colorpicker.txt*    HSL-based color picker for Neovim
+
+Author:  MikeVSkater
+License: MIT
+Version: 1.9.5
+
+==============================================================================
+CONTENTS                                           *nvim-colorpicker-contents*
+
+    1. Introduction .......................... |nvim-colorpicker-intro|
+    2. Requirements .......................... |nvim-colorpicker-requirements|
+    3. Installation .......................... |nvim-colorpicker-installation|
+    4. Configuration ......................... |nvim-colorpicker-config|
+    5. Commands .............................. |nvim-colorpicker-commands|
+    6. Keymaps ............................... |nvim-colorpicker-keymaps|
+    7. Lua API ............................... |nvim-colorpicker-api|
+    8. Highlight Groups ...................... |nvim-colorpicker-highlights|
+    9. External Integration .................. |nvim-colorpicker-integration|
+   10. Troubleshooting ....................... |nvim-colorpicker-troubleshooting|
+
+==============================================================================
+1. INTRODUCTION                                       *nvim-colorpicker-intro*
+
+nvim-colorpicker is a powerful HSL-based color picker for Neovim with visual
+grid navigation, multiple picker interfaces, real-time preview and more.
+
+Features:~
+- HSL Color Grid - Interactive visual grid for selecting hue and lightness
+- Multiple Picker Interfaces - Full multipanel, mini grid, and mini slider mode
+- Color Detection - Automatically detect and replace colors in code
+- Buffer Highlighting - Real-time color highlighting (background/foreground/virtualtext)
+- Rich Preset Library - 600+ colors from Web, Material, and Tailwind palettes
+- Alpha Channel Support - Full opacity editing with visual feedback
+- Keyboard Layout Aware - Auto-detects Colemak/Dvorak remaps
+- Format Intelligent - Preserves original color format on replacement
+
+==============================================================================
+2. REQUIREMENTS                                *nvim-colorpicker-requirements*
+
+- Neovim >= 0.9.0
+- nvim-float (https://github.com/mikevskater/nvim-float)
+- Recommended: 'termguicolors' enabled for accurate color display
+
+==============================================================================
+3. INSTALLATION                                *nvim-colorpicker-installation*
+
+Using lazy.nvim:~
+>lua
+    {
+      "mikevskater/nvim-colorpicker",
+      dependencies = {
+        "mikevskater/nvim-float",
+      },
+      config = function()
+        require("nvim-colorpicker").setup()
+      end,
+      keys = {
+        { "<leader>cp", "<cmd>ColorPicker<cr>", desc = "Color Picker" },
+        { "<leader>cm", "<cmd>ColorPickerMini<cr>", desc = "Mini Color Picker" },
+      },
+    }
+<
+
+Using packer.nvim:~
+>lua
+    use {
+      "mikevskater/nvim-colorpicker",
+      requires = { "mikevskater/nvim-float" },
+      config = function()
+        require("nvim-colorpicker").setup()
+      end,
+    }
+<
+
+==============================================================================
+4. CONFIGURATION                                     *nvim-colorpicker-config*
+
+Call `setup()` to initialize with options. All options are optional.
+
+>lua
+    require("nvim-colorpicker").setup({
+      -- Default color output format: "hex", "rgb", "hsl", "hsv"
+      default_format = "hex",
+
+      -- Hex color case: "upper" or "lower"
+      hex_case = "upper",
+
+      -- Enable alpha channel editing by default
+      alpha_enabled = false,
+
+      -- Number of recent colors to track in history
+      recent_colors_count = 10,
+
+      -- Preset palettes: {"web", "material", "tailwind"}
+      presets = {},
+
+      -- Auto-detect movement keys from global Neovim keymaps
+      inherit_movement_keys = true,
+
+      -- Inline color highlighting
+      highlight = {
+        enable = false,
+        filetypes = "*",
+        exclude_filetypes = { "lazy", "mason", "help" },
+        mode = "background",  -- "background", "foreground", "virtualtext"
+        swatch_char = "■",
+      },
+
+      -- Keymap configuration
+      keymaps = {
+        nav_left = "h",
+        nav_right = "l",
+        nav_up = "k",
+        nav_down = "j",
+        sat_up = "K",
+        sat_down = "J",
+        step_down = "-",
+        step_up = { "+", "=" },
+        reset = "r",
+        hex_input = "#",
+        apply = "<CR>",
+        cancel = { "q", "<Esc>" },
+        help = "?",
+        cycle_mode = "m",
+        cycle_format = "f",
+        alpha_up = "A",
+        alpha_down = "a",
+        focus_next = "<Tab>",
+        focus_prev = "<S-Tab>",
+      },
+    })
+<
+
+                                              *nvim-colorpicker-config-options*
+Options:~
+
+  `default_format`        Output format: "hex", "rgb", "hsl", "hsv"
+  `hex_case`              Case for hex: "upper" (#FF5500) or "lower" (#ff5500)
+  `alpha_enabled`         Enable alpha channel editing in the picker. 
+			   'true' needs opacity in the color already.
+  `recent_colors_count`   Maximum recent colors to track (default: 10)
+  `presets`               Preset palettes to load
+  `inherit_movement_keys` Auto-detect remapped h/j/k/l keys
+
+                                            *nvim-colorpicker-highlight-config*
+Highlight options:~
+
+  `highlight.enable`             Enable auto-highlighting on buffer enter
+  `highlight.filetypes`          Filetypes to highlight: "*" or list
+  `highlight.exclude_filetypes`  Filetypes to exclude
+  `highlight.mode`               Display: "background", "foreground", "virtualtext"
+  `highlight.swatch_char`        Character for virtualtext swatch
+
+==============================================================================
+5. COMMANDS                                       *nvim-colorpicker-commands*
+
+                                                               *:ColorPicker*
+:ColorPicker [color]         Open full color picker. 
+                               - Optional initial color.
+
+                                                       *:ColorPickerAtCursor*
+:ColorPickerAtCursor         Detect color at cursor, open fullsize picker,
+                               replace on confirm/apply.
+
+                                                           *:ColorPickerMini*
+:ColorPickerMini [color]     Open compact inline picker.
+                               - Optional initial color.
+
+                                                   *:ColorPickerMiniAtCursor*
+:ColorPickerMiniAtCursor     Detect color at cursor, open mini grid picker.
+
+                                                     *:ColorPickerMiniSlider*
+:ColorPickerMiniSlider [color] 
+                             Open mini picker in slider mode.
+			       - Optional initial color.
+
+                                             *:ColorPickerMiniSliderAtCursor*
+:ColorPickerMiniSliderAtCursor  
+			     Detect color at cursor, open mini slider picker,
+			       starting at color under cursor.
+
+                                                              *:ColorConvert*
+:ColorConvert [format]       Convert color at cursor. 
+                               Formats: hex, rgb, hsl, hsv.
+
+                                                                 *:ColorYank*
+:ColorYank [format]          Copy color at cursor to clipboard.
+                               - Optional format: hex, rgb, hsl, hsv.
+
+                                                                *:ColorPaste*
+:ColorPaste                  Paste color from clipboard and insert at cursor.
+
+                                                            *:ColorHighlight*
+:ColorHighlight          Toggle color highlighting in current buffer.
+:ColorHighlight on       Enable highlighting.
+:ColorHighlight off      Disable highlighting.
+:ColorHighlight auto     Enable auto-highlighting for configured filetypes.
+:ColorHighlight noauto   Disable auto-highlighting.
+:ColorHighlight background
+                         Set highlight mode to background.
+:ColorHighlight foreground
+                         Set highlight mode to foreground.
+:ColorHighlight virtualtext
+                         Set highlight mode to virtualtext.
+
+                                                              *:ColorHistory*
+:ColorHistory [count]    Display recent colors (default: 10).
+
+                                                               *:ColorSearch*
+:ColorSearch <query>     Search presets by color name.
+
+                                                           *:ColorPickerTest*
+:ColorPickerTest         Run tests and show results in UI.
+:ColorPickerTest run     Run tests and print to console.
+:ColorPickerTest last    Show last saved test results.
+
+==============================================================================
+6. KEYMAPS                                          *nvim-colorpicker-keymaps*
+
+                                         *nvim-colorpicker-keymaps-navigation*
+Grid Navigation:~
+  h / l          Adjust hue (left/right)
+  j / k          Adjust lightness (down/up)
+  J / K          Adjust saturation (less/more)
+  [count]        Use count prefix: 10h, 50k
+
+                                               *nvim-colorpicker-keymaps-step*
+Step Size:~
+  - / +          Decrease/increase step multiplier
+
+                                               *nvim-colorpicker-keymaps-mode*
+Color Mode:~
+  m              Cycle mode: HEX → HSL → RGB → HSV → CMYK
+  f              Toggle format: standard/decimal
+
+                                              *nvim-colorpicker-keymaps-alpha*
+Alpha (when enabled):~
+  a / A          Decrease/increase alpha
+  [count]a/A     Adjust by count
+
+                                               *nvim-colorpicker-keymaps-tabs*
+Tab Navigation (Full Picker):~
+  g1             Info tab (sliders)
+  g2             History tab
+  g3             Presets tab
+  Tab / S-Tab    Focus next/previous panel (grid<->info)
+  
+Info Panel:~
+  h / l          Move cursor left/right 
+  j / k          Move cursor up/down
+  + / -          Increase/decrease value (sliders)
+
+
+                                            *nvim-colorpicker-keymaps-actions*
+Actions:~
+  #              Enter color manually
+  r              Reset to original
+  Enter          Apply and close
+  q / Esc        Cancel and close
+  ?              Show Controls
+
+                                            *nvim-colorpicker-keymaps-history*
+History Tab:~
+  j / k          Navigate items
+  Enter          Jump to color in grid
+  d              Delete color
+  c              Clear all
+
+                                            *nvim-colorpicker-keymaps-presets*
+Presets Tab:~
+  j / k          Navigate items
+  l / h          Expand/collapse group
+  Enter          Expand/collapse group
+  zo / zc        Open/close group
+  zR / zM        Expand/collapse all
+  Enter          Jump to color in grid
+                                               *nvim-colorpicker-keymaps-mini*
+Mini Picker:~
+  s              Toggle between grid and slider mode
+
+==============================================================================
+7. LUA API                                             *nvim-colorpicker-api*
+
+>lua
+    local colorpicker = require("nvim-colorpicker")
+<
+
+                                                         *colorpicker.version*
+colorpicker.version~
+    Current plugin version string.
+>lua
+    print(colorpicker.version)  -- "2.0.0"
+<
+
+                                                           *colorpicker.setup*
+colorpicker.setup({opts})~
+    Initialize with configuration options. (see |nvim-colorpicker-config|)
+
+                                                            *colorpicker.pick*
+colorpicker.pick({opts})~
+    Open the main color picker.
+
+    Options:~
+      `color`           Initial color (hex/rgb/hsl)
+      `title`           Custom window title
+      `on_select`       Callback on confirm: function(result)
+      `on_cancel`       Callback on cancel: function()
+      `on_change`       Callback on every change: function(result)
+      `keymaps`         Override keymaps for this instance
+      `alpha_enabled`   Enable alpha editing
+      `initial_alpha`   Initial alpha value (0-100)
+      `forced_mode`     Force mode: "hsl", "rgb", "hsv", "cmyk"
+      `custom_controls` Custom UI controls
+
+>lua
+    colorpicker.pick({
+      color = "#ff5500",
+      alpha_enabled = true,
+      on_select = function(result)
+        print("Selected: " .. result.color)
+      end,
+    })
+<
+
+                                                  *colorpicker.pick_at_cursor*
+colorpicker.pick_at_cursor()~
+    Detect color at cursor and open picker for replacement.
+
+                                                *colorpicker.detect_at_cursor*
+colorpicker.detect_at_cursor()~
+    Detect color at cursor without opening picker.
+    Returns: table with color, start_col, end_col, format, alpha, original
+
+                                               *colorpicker.convert_at_cursor*
+colorpicker.convert_at_cursor({format})~
+    Convert color at cursor to specified format.
+
+                                                       *colorpicker.set_color*
+colorpicker.set_color({hex}, {original_hex})~
+    Update current color in open picker.
+
+                                                       *colorpicker.get_color*
+colorpicker.get_color()~
+    Get current color from open picker. Returns hex string or nil.
+
+                                                         *colorpicker.is_open*
+colorpicker.is_open()~
+    Check if main picker is open. Returns boolean.
+
+                                                       *colorpicker.pick_mini*
+colorpicker.pick_mini({opts})~
+    Open compact inline picker. Same options as pick().
+
+                                             *colorpicker.pick_mini_at_cursor*
+colorpicker.pick_mini_at_cursor()~
+    Detect color at cursor and open mini picker.
+
+                                                    *colorpicker.is_mini_open*
+colorpicker.is_mini_open()~
+    Check if mini picker is open. Returns boolean.
+
+                                                      *colorpicker.close_mini*
+colorpicker.close_mini()~
+    Close mini picker.
+
+                                                  *colorpicker.pick_mini_slider*
+colorpicker.pick_mini_slider({opts})~
+    Open mini picker in slider mode (no grid).
+
+                                        *colorpicker.pick_mini_slider_at_cursor*
+colorpicker.pick_mini_slider_at_cursor()~
+    Detect color and open mini slider picker.
+
+                                              *colorpicker.is_mini_slider_mode*
+colorpicker.is_mini_slider_mode()~
+    Check if mini picker is in slider mode. Returns boolean.
+
+                                                         *colorpicker.presets*
+colorpicker.presets()~
+    Get presets module.
+
+                                                *colorpicker.get_preset_names*
+colorpicker.get_preset_names()~
+    Get available preset names. Returns string[].
+
+                                                  *colorpicker.search_presets*
+colorpicker.search_presets({query})~
+    Search presets by color name. Returns table with name, hex, preset, group.
+
+                                                         *colorpicker.history*
+colorpicker.history()~
+    Get history module.
+
+                                                            *colorpicker.yank*
+colorpicker.yank({hex}, {format})~
+    Copy color to clipboard. Both parameters optional.
+    If hex is nil, uses color at cursor.
+>lua
+    colorpicker.yank("#ff5500", "rgb")  -- Copies: rgb(255, 85, 0)
+    colorpicker.yank(nil, "hex")        -- Yanks color at cursor as hex
+    colorpicker.yank()                  -- Yanks in default format
+<
+
+                                                           *colorpicker.paste*
+colorpicker.paste()~
+    Paste and parse color from clipboard. Returns hex string or nil.
+
+                                                *colorpicker.get_recent_colors*
+colorpicker.get_recent_colors({count})~
+    Get recent colors from history. Count is optional, defaults to 10.
+    Returns string[] hex colors (most recent first).
+
+                                                *colorpicker.add_recent_color*
+colorpicker.add_recent_color({hex})~
+    Add color to history.
+
+                                                       *colorpicker.highlight*
+colorpicker.highlight()~
+    Get highlight module.
+
+                                                *colorpicker.toggle_highlight*
+colorpicker.toggle_highlight()~
+    Toggle highlighting in current buffer.
+
+                                                *colorpicker.enable_highlight*
+colorpicker.enable_highlight()~
+    Enable highlighting in current buffer.
+
+                                               *colorpicker.disable_highlight*
+colorpicker.disable_highlight()~
+    Disable highlighting in current buffer.
+
+                                           *colorpicker.enable_auto_highlight*
+colorpicker.enable_auto_highlight({patterns})~
+    Enable auto-highlighting for file patterns. Patterns optional.
+>lua
+    colorpicker.enable_auto_highlight({ "*.css", "*.scss" })
+    colorpicker.enable_auto_highlight()  -- Use config defaults
+<
+
+                                          *colorpicker.disable_auto_highlight*
+colorpicker.disable_auto_highlight()~
+    Disable auto-highlighting.
+
+                                              *colorpicker.set_highlight_mode*
+colorpicker.set_highlight_mode({mode})~
+    Set highlight display mode: "background", "foreground", "virtualtext"
+
+                                                           *colorpicker.utils*
+colorpicker.utils()~
+    Get color utilities module.
+>lua
+    local utils = colorpicker.utils()
+    local r, g, b = utils.hex_to_rgb("#ff5500")
+    local hex = utils.rgb_to_hex(255, 85, 0)
+<
+
+==============================================================================
+8. HIGHLIGHT GROUPS                              *nvim-colorpicker-highlights*
+
+                                    *nvim-colorpicker-highlights-customizable*
+Customizable groups:~
+
+  `NvimColorPickerMiniOriginal`      Mini picker original preview
+  `NvimColorPickerMiniCurrent`       Mini picker current preview
+  `NvimColorPickerOriginalPreview`   Full picker original preview
+  `NvimColorPickerCurrentPreview`    Full picker current preview
+
+                                         *nvim-colorpicker-highlights-dynamic*
+Dynamic groups (auto-generated):~
+
+  `NvimColorPickerCell_ROW_COL`      Full picker grid cells (e.g., _5_7)
+  `NvimColorPicker_XXXXXX`           Buffer highlighting (e.g., _FF5500)
+  `NvimColorPickerHistory_XXXXXX`    History tab swatches
+  `NvimColorPickerPreset_XXXXXX`     Presets tab swatches
+
+                                       *nvim-colorpicker-highlights-customize*
+Customization example:~
+>lua
+    vim.api.nvim_set_hl(0, "NvimColorPickerMiniOriginal", {
+      fg = "#888888",
+      italic = true,
+    })
+
+    vim.api.nvim_set_hl(0, "NvimColorPickerMiniCurrent", {
+      fg = "#FFFFFF",
+      bold = true,
+    })
+<
+
+                                             *nvim-colorpicker-highlight-modes*
+Buffer highlight modes:~
+
+  `background`     Color shown as background with contrasting text (default)
+  `foreground`     Color shown as text foreground only
+  `virtualtext`    Color swatch character displayed before the color
+
+==============================================================================
+9. EXTERNAL INTEGRATION                         *nvim-colorpicker-integration*
+
+nvim-colorpicker can be integrated into other plugins using callbacks.
+  (see '.\assets\external-usage.gif' for a usage example)
+
+                                       *nvim-colorpicker-integration-callbacks*
+Basic callback pattern:~
+>lua
+    local colorpicker = require("nvim-colorpicker")
+
+    colorpicker.pick({
+      color = initial_color,
+      title = "Edit Color",
+
+      -- Called on every color change (live preview)
+      on_change = function(result)
+        update_preview(result.color)
+      end,
+
+      -- Called when user confirms (Enter)
+      on_select = function(result)
+        save_color(result.color)
+      end,
+
+      -- Called when user cancels (Escape)
+      on_cancel = function()
+        restore_original()
+      end,
+    })
+<
+
+                                         *nvim-colorpicker-integration-result*
+Result object structure:~
+>lua
+    {
+      color = "#ff5500",      -- Selected hex color
+      alpha = 85,             -- Alpha 0-100 (if alpha_enabled)
+      custom = {              -- Custom control values
+        control_id = value,
+      },
+    }
+<
+
+                                       *nvim-colorpicker-integration-controls*
+Custom controls:~
+
+Add custom UI controls for advanced use cases:
+>lua
+    colorpicker.pick({
+      custom_controls = {
+        {
+          id = "target",
+          type = "select",
+          label = "Target",
+          options = { "fg", "bg" },
+          default = "fg",
+          key = "B",
+          on_change = function(new_value, old_value)
+            -- Handle change
+          end,
+        },
+        {
+          id = "bold",
+          type = "toggle",
+          label = "Bold",
+          default = false,
+          key = "b",
+        },
+      },
+      on_select = function(result)
+        local target = result.custom.target
+        local bold = result.custom.bold
+      end,
+    })
+<
+
+Control types:~
+  `toggle`     Boolean on/off (id, label, default, key)
+  `select`     Cycle through options (id, label, options, default, key)
+  `number`     Numeric value (id, label, min, max, step, default)
+  `text`       Text input (id, label, default)
+
+                                    *nvim-colorpicker-integration-programmatic*
+Programmatic control:~
+>lua
+    -- Check picker state
+    if colorpicker.is_open() then
+      local current = colorpicker.get_color()
+
+      -- Update picker color
+      colorpicker.set_color("#00ff00", current)
+      --                    ^new       ^original for comparison
+    end
+<
+
+==============================================================================
+10. TROUBLESHOOTING                         *nvim-colorpicker-troubleshooting*
+
+                                   *nvim-colorpicker-troubleshooting-colors*
+Colors not displaying properly:~
+    Ensure termguicolors is enabled:
+>lua
+    vim.opt.termguicolors = true
+<
+
+                                   *nvim-colorpicker-troubleshooting-keymaps*
+Custom keymaps not working:~
+    Disable auto-detection if using custom navigation keys:
+>lua
+    require("nvim-colorpicker").setup({
+      inherit_movement_keys = false,
+      keymaps = { ... },
+    })
+<
+
+                                *nvim-colorpicker-troubleshooting-highlighting*
+Highlighting appears in wrong buffers:~
+    Refine your exclude list:
+>lua
+    highlight = {
+      exclude_filetypes = {
+        "lazy", "mason", "help", "TelescopePrompt",
+        "NvimTree", "neo-tree", "dashboard", "alpha",
+      },
+    }
+<
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:
