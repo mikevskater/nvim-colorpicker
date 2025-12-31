@@ -148,23 +148,41 @@ end
 ---Convert a color string to a different format
 ---@param color string Color string (hex, rgb(), hsl())
 ---@param target_format "hex"|"rgb"|"hsl"|"hsv" Target format
+---@param alpha number? Optional alpha value (0-100). If nil, extracts from input color.
 ---@return string? converted Converted color string, or nil if invalid
-function M.convert_format(color, target_format)
-  -- Parse the input color to hex first
-  local hex = M.parse_color_string(color)
+function M.convert_format(color, target_format, alpha)
+  -- Parse the input color to hex first (also extracts alpha)
+  local hex, detected_alpha = M.parse_color_string(color)
   if not hex then return nil end
+
+  -- Use provided alpha, or detected alpha, or nil (no alpha)
+  local final_alpha = alpha or detected_alpha
 
   -- Convert to target format
   if target_format == "hex" then
+    if final_alpha and final_alpha < 100 then
+      -- Include alpha as hex byte
+      local alpha_byte = math.floor(final_alpha * 255 / 100 + 0.5)
+      return hex .. string.format("%02X", alpha_byte)
+    end
     return hex
   elseif target_format == "rgb" then
     local r, g, b = hex_module.hex_to_rgb(hex)
+    if final_alpha and final_alpha < 100 then
+      return string.format("rgba(%d, %d, %d, %.2f)", math.floor(r + 0.5), math.floor(g + 0.5), math.floor(b + 0.5), final_alpha / 100)
+    end
     return string.format("rgb(%d, %d, %d)", math.floor(r + 0.5), math.floor(g + 0.5), math.floor(b + 0.5))
   elseif target_format == "hsl" then
     local h, s, l = hsl_module.hex_to_hsl(hex)
+    if final_alpha and final_alpha < 100 then
+      return string.format("hsla(%d, %d%%, %d%%, %.2f)", math.floor(h + 0.5), math.floor(s + 0.5), math.floor(l + 0.5), final_alpha / 100)
+    end
     return string.format("hsl(%d, %d%%, %d%%)", math.floor(h + 0.5), math.floor(s + 0.5), math.floor(l + 0.5))
   elseif target_format == "hsv" then
     local h, s, v = hsv_module.hex_to_hsv(hex)
+    if final_alpha and final_alpha < 100 then
+      return string.format("hsva(%d, %d%%, %d%%, %.2f)", math.floor(h + 0.5), math.floor(s + 0.5), math.floor(v + 0.5), final_alpha / 100)
+    end
     return string.format("hsv(%d, %d%%, %d%%)", math.floor(h + 0.5), math.floor(s + 0.5), math.floor(v + 0.5))
   end
 
@@ -174,6 +192,7 @@ end
 ---Parse any color string format to hex
 ---@param color string Color string (hex, rgb(), rgba(), hsl(), hsla(), hsv())
 ---@return string? hex Hex color or nil if invalid
+---@return number? alpha Alpha value 0-100 or nil if no alpha
 function M.parse_color_string(color)
   if not color or type(color) ~= "string" then return nil end
 
@@ -186,19 +205,30 @@ function M.parse_color_string(color)
     if #hex == 3 then
       -- Expand shorthand #RGB to #RRGGBB
       hex = hex:sub(1, 1):rep(2) .. hex:sub(2, 2):rep(2) .. hex:sub(3, 3):rep(2)
-      return "#" .. hex:upper()
+      return "#" .. hex:upper(), nil
     elseif #hex == 6 then
-      return "#" .. hex:upper()
+      return "#" .. hex:upper(), nil
     elseif #hex == 8 then
-      -- 8-digit hex with alpha - return the color part
-      return "#" .. hex:sub(1, 6):upper()
+      -- 8-digit hex with alpha - extract alpha as percentage
+      local alpha_byte = tonumber(hex:sub(7, 8), 16)
+      local alpha_pct = math.floor(alpha_byte * 100 / 255 + 0.5)
+      return "#" .. hex:sub(1, 6):upper(), alpha_pct
     end
   end
 
-  -- RGB format: rgb(r, g, b) - integer values
-  local r, g, b = color:match("rgba?%s*%(%s*(%d+)%s*,%s*(%d+)%s*,%s*(%d+)")
+  -- RGBA format: rgba(r, g, b, a) - with alpha
+  local r, g, b, a = color:match("rgba%s*%(%s*(%d+)%s*,%s*(%d+)%s*,%s*(%d+)%s*,%s*([%d%.]+)")
+  if r and g and b and a then
+    local alpha_val = tonumber(a)
+    -- Alpha can be 0-1 decimal or 0-100 percentage
+    local alpha_pct = alpha_val <= 1 and math.floor(alpha_val * 100 + 0.5) or math.floor(alpha_val + 0.5)
+    return hex_module.rgb_to_hex(tonumber(r), tonumber(g), tonumber(b)), alpha_pct
+  end
+
+  -- RGB format: rgb(r, g, b) - integer values (no alpha)
+  r, g, b = color:match("rgb%s*%(%s*(%d+)%s*,%s*(%d+)%s*,%s*(%d+)")
   if r and g and b then
-    return hex_module.rgb_to_hex(tonumber(r), tonumber(g), tonumber(b))
+    return hex_module.rgb_to_hex(tonumber(r), tonumber(g), tonumber(b)), nil
   end
 
   -- RGB format with percentage values: rgb(r%, g%, b%)
@@ -207,25 +237,43 @@ function M.parse_color_string(color)
     local rv = math.floor(tonumber(rp) * 255 / 100 + 0.5)
     local gv = math.floor(tonumber(gp) * 255 / 100 + 0.5)
     local bv = math.floor(tonumber(bp) * 255 / 100 + 0.5)
-    return hex_module.rgb_to_hex(rv, gv, bv)
+    return hex_module.rgb_to_hex(rv, gv, bv), nil
   end
 
-  -- HSL format: hsl(h, s%, l%) or hsla(h, s%, l%, a)
-  local h, s, l = color:match("hsla?%s*%(%s*(%d+)%s*,%s*(%d+)%%%s*,%s*(%d+)%%")
+  -- HSLA format: hsla(h, s%, l%, a)
+  local h, s, l
+  h, s, l, a = color:match("hsla%s*%(%s*(%d+)%s*,%s*(%d+)%%%s*,%s*(%d+)%%%s*,%s*([%d%.]+)")
+  if h and s and l and a then
+    local alpha_val = tonumber(a)
+    local alpha_pct = alpha_val <= 1 and math.floor(alpha_val * 100 + 0.5) or math.floor(alpha_val + 0.5)
+    return hsl_module.hsl_to_hex(tonumber(h), tonumber(s), tonumber(l)), alpha_pct
+  end
+
+  -- HSL format: hsl(h, s%, l%) (no alpha)
+  h, s, l = color:match("hsl%s*%(%s*(%d+)%s*,%s*(%d+)%%%s*,%s*(%d+)%%")
   if h and s and l then
-    return hsl_module.hsl_to_hex(tonumber(h), tonumber(s), tonumber(l))
+    return hsl_module.hsl_to_hex(tonumber(h), tonumber(s), tonumber(l)), nil
   end
 
-  -- HSV format: hsv(h, s%, v%) - with percent signs
-  local hh, ss, v = color:match("hsv%s*%(%s*(%d+)%s*,%s*(%d+)%%%s*,%s*(%d+)%%")
+  -- HSVA format: hsva(h, s%, v%, a)
+  local hh, ss, v
+  hh, ss, v, a = color:match("hsva%s*%(%s*(%d+)%s*,%s*(%d+)%%%s*,%s*(%d+)%%%s*,%s*([%d%.]+)")
+  if hh and ss and v and a then
+    local alpha_val = tonumber(a)
+    local alpha_pct = alpha_val <= 1 and math.floor(alpha_val * 100 + 0.5) or math.floor(alpha_val + 0.5)
+    return hsv_module.hsv_to_hex(tonumber(hh), tonumber(ss), tonumber(v)), alpha_pct
+  end
+
+  -- HSV format: hsv(h, s%, v%) - with percent signs (no alpha)
+  hh, ss, v = color:match("hsv%s*%(%s*(%d+)%s*,%s*(%d+)%%%s*,%s*(%d+)%%")
   if hh and ss and v then
-    return hsv_module.hsv_to_hex(tonumber(hh), tonumber(ss), tonumber(v))
+    return hsv_module.hsv_to_hex(tonumber(hh), tonumber(ss), tonumber(v)), nil
   end
 
   -- HSV format: hsv(h, s, v) - without percent signs (values 0-100)
   hh, ss, v = color:match("hsv%s*%(%s*(%d+)%s*,%s*(%d+)%s*,%s*(%d+)")
   if hh and ss and v then
-    return hsv_module.hsv_to_hex(tonumber(hh), tonumber(ss), tonumber(v))
+    return hsv_module.hsv_to_hex(tonumber(hh), tonumber(ss), tonumber(v)), nil
   end
 
   return nil
