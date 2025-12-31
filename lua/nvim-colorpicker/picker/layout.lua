@@ -74,8 +74,8 @@ function M.create_layout_config()
           },
         }
       },
-      total_width_ratio = 0.95,
-      total_height_ratio = 0.85,
+      total_width_ratio = 0.85,
+      total_height_ratio = 0.75,
     }
   else
     return {
@@ -102,8 +102,8 @@ function M.create_layout_config()
           },
         }
       },
-      total_width_ratio = 0.80,
-      total_height_ratio = 0.75,
+      total_width_ratio = 0.70,
+      total_height_ratio = 0.65,
     }
   end
 end
