@@ -14,7 +14,12 @@ end
 vim.api.nvim_create_user_command('ColorPicker', function(opts)
   local colorpicker = require('nvim-colorpicker')
   local initial_color = opts.args ~= '' and opts.args or nil
-  colorpicker.pick({ color = initial_color })
+  colorpicker.pick({
+    color = initial_color,
+    on_select = function(result)
+      vim.api.nvim_put({ result.color }, 'c', true, true)
+    end,
+  })
 end, {
   nargs = '?',
   desc = 'Open color picker (optional: initial color)',
@@ -30,7 +35,12 @@ end, {
 vim.api.nvim_create_user_command('ColorPickerMini', function(opts)
   local colorpicker = require('nvim-colorpicker')
   local initial_color = opts.args ~= '' and opts.args or nil
-  colorpicker.pick_mini({ color = initial_color })
+  colorpicker.pick_mini({
+    color = initial_color,
+    on_select = function(result)
+      vim.api.nvim_put({ result.color }, 'c', true, true)
+    end,
+  })
 end, {
   nargs = '?',
   desc = 'Open compact inline color picker (optional: initial color)',

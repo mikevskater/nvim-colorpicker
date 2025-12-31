@@ -218,6 +218,14 @@ function ColorPicker.show_multipanel(options)
       if not State.state then return end
 
       local current_win = vim.api.nvim_get_current_win()
+
+      -- Check if focus moved to a floating window (e.g., controls popup)
+      -- Don't close picker if user is interacting with a modal/popup
+      local ok, win_config = pcall(vim.api.nvim_win_get_config, current_win)
+      if ok and win_config.relative and win_config.relative ~= '' then
+        return
+      end
+
       local grid_panel = State.state._multipanel and State.state._multipanel.panels["grid"]
       local info_panel = State.state._multipanel and State.state._multipanel.panels["info"]
 

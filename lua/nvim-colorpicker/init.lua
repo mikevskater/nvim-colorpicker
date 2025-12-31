@@ -172,7 +172,8 @@ function M.convert_at_cursor(format)
     return
   end
 
-  local converted = utils.convert_format(color_info.color, format)
+  -- Pass alpha to preserve it in conversion (nil if no alpha detected)
+  local converted = utils.convert_format(color_info.color, format, color_info.alpha)
   if converted then
     -- Direct replacement (don't use replace_color_at_cursor which re-formats)
     local line = vim.api.nvim_get_current_line()
