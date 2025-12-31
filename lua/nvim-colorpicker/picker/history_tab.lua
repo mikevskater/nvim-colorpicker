@@ -140,6 +140,11 @@ function M.select_current(schedule_render)
       state.alpha = selected_item.alpha
     end
 
+    -- Restore color mode from history (only if not locked by forced_mode)
+    if selected_item.format and not state.options.forced_mode then
+      state.color_mode = selected_item.format
+    end
+
     -- Update saved HSL for proper grid navigation
     local h, s, _ = ColorUtils.hex_to_hsl(selected_item.hex)
     state.saved_hsl = { h = h, s = s }
@@ -175,7 +180,7 @@ function M.delete_current(schedule_render)
   -- Clear and re-add remaining colors (in reverse to maintain order)
   History.clear_recent()
   for i = #new_colors, 1, -1 do
-    History.add_recent(new_colors[i].hex, new_colors[i].alpha)
+    History.add_recent(new_colors[i].hex, new_colors[i].alpha, new_colors[i].format)
   end
 
   -- Adjust cursor if needed
@@ -250,10 +255,17 @@ function M.render_history_content(cb)
       local display_hex = display_items[i]
       local padded_hex = display_hex .. string.rep(" ", max_hex_len - #display_hex)
 
+      -- Format indicator (show if not hex)
+      local format_indicator = ""
+      if item.format and item.format ~= "hex" then
+        format_indicator = " [" .. item.format:upper() .. "]"
+      end
+
       cb:spans({
         { text = "  ", style = "normal" },
         { text = string.format("%2d ", i), style = "value" },
         { text = padded_hex, style = "value" },
+        { text = format_indicator, style = "muted" },
       })
 
       -- Store extmark data for this line

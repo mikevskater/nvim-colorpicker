@@ -12,6 +12,7 @@ local utils = require('nvim-colorpicker.color')
 ---@class HistoryItem
 ---@field hex string Hex color value
 ---@field alpha number Alpha value (0-100 percentage)
+---@field format string? Original color format ("hex"|"rgb"|"hsl"|"hsv")
 
 -- ============================================================================
 -- State
@@ -30,7 +31,8 @@ local max_recent = 10
 ---Add a color to recent history
 ---@param hex string Hex color
 ---@param alpha number? Alpha value (0-100 percentage, default: 100)
-function M.add_recent(hex, alpha)
+---@param format string? Original color format ("hex"|"rgb"|"hsl"|"hsv")
+function M.add_recent(hex, alpha, format)
   if not hex or not utils.is_valid_hex(hex) then return end
 
   hex = utils.normalize_hex(hex)
@@ -46,8 +48,8 @@ function M.add_recent(hex, alpha)
     end
   end
 
-  -- Add to front as table with hex and alpha
-  table.insert(recent_colors, 1, { hex = hex, alpha = alpha })
+  -- Add to front as table with hex, alpha, and format
+  table.insert(recent_colors, 1, { hex = hex, alpha = alpha, format = format })
 
   -- Trim to max size
   while #recent_colors > max_recent do
