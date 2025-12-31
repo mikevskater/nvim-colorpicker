@@ -56,7 +56,12 @@ end, {
 vim.api.nvim_create_user_command('ColorPickerMiniSlider', function(opts)
   local colorpicker = require('nvim-colorpicker')
   local initial_color = opts.args ~= '' and opts.args or nil
-  colorpicker.pick_mini_slider({ color = initial_color })
+  colorpicker.pick_mini_slider({
+    color = initial_color,
+    on_select = function(result)
+      vim.api.nvim_put({ result.color }, 'c', true, true)
+    end,
+  })
 end, {
   nargs = '?',
   desc = 'Open mini picker in slider mode (optional: initial color)',

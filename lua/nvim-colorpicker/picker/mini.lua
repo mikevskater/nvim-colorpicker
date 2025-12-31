@@ -652,6 +652,7 @@ function M.pick(opts)
     on_cancel = opts.on_cancel,
     alpha_enabled = alpha_enabled,
     initial_alpha = initial_alpha,
+    forced_mode = opts.forced_mode,
   }
 
   -- Calculate initial grid size (will be recalculated on render)
