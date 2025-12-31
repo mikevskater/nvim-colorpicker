@@ -283,6 +283,7 @@ function ColorPicker.pick(opts)
     initial_alpha = opts.initial_alpha,
     keymaps = opts.keymaps,
     custom_controls = opts.custom_controls,
+    target_filetype = opts.target_filetype,
   })
 end
 

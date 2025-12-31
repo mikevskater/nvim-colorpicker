@@ -6,6 +6,11 @@ local Grid = require('nvim-colorpicker.picker.grid')
 local Preview = require('nvim-colorpicker.picker.preview')
 local History = require('nvim-colorpicker.history')
 
+-- Lazy-load filetypes to avoid circular dependencies
+local function get_filetypes()
+  return require('nvim-colorpicker.filetypes')
+end
+
 local M = {}
 
 -- ============================================================================
@@ -13,13 +18,29 @@ local M = {}
 -- ============================================================================
 
 ---Build result object from current state
----@return table result The result object with color, alpha, and custom values
+---@return table result The result object with color, alpha, hex, and custom values
 function M.build_result()
   local state = State.state
   if not state then return {} end
 
   local result = vim.deepcopy(state.current)
-  result.alpha = state.alpha_enabled and state.alpha or nil
+  local alpha = state.alpha_enabled and state.alpha or nil
+  result.alpha = alpha
+
+  -- Always include raw hex for reference
+  result.hex = state.current.color
+
+  -- Format color according to target filetype if specified
+  local target_ft = state.options.target_filetype
+  if target_ft then
+    local filetypes = get_filetypes()
+    local adapter = filetypes.get_adapter(target_ft)
+    if adapter then
+      -- Use adapter's default format (or color_mode if it matches a supported format)
+      local format = adapter.default_format
+      result.color = adapter:format_color(state.current.color, format, alpha)
+    end
+  end
 
   if state.options.custom_controls and #state.options.custom_controls > 0 then
     result.custom = vim.deepcopy(state.custom_values)

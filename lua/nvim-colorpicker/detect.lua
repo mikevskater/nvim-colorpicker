@@ -7,7 +7,13 @@ local M = {}
 
 local utils = require('nvim-colorpicker.color')
 
+-- Lazy-load filetypes module to avoid circular dependencies
+local function get_filetypes()
+  return require('nvim-colorpicker.filetypes')
+end
+
 -- Color patterns to detect (order matters - more specific patterns first)
+-- These are kept as fallback for when no adapter is available
 local PATTERNS = {
   -- Vim highlight guifg/guibg (must come before hex to avoid double-matching)
   { pattern = "gui[fb]g=#%x%x%x%x%x%x", format = "vim" },
@@ -23,6 +29,34 @@ local PATTERNS = {
   { pattern = "#%x%x%x%x%x%x", format = "hex" },
   { pattern = "#%x%x%x", format = "hex3" },
 }
+
+---Get patterns for a filetype
+---@param filetype string? The filetype
+---@return table[] patterns Array of pattern definitions
+local function get_patterns_for_filetype(filetype)
+  local filetypes = get_filetypes()
+  local adapter = filetypes.get_adapter(filetype)
+  if adapter and adapter.patterns then
+    return adapter.patterns
+  end
+  return PATTERNS
+end
+
+---Parse a match using the appropriate adapter
+---@param match string The matched string
+---@param format string The format type
+---@param filetype string? The filetype context
+---@return string? hex Hex color
+---@return number? alpha Alpha value 0-100
+local function parse_with_adapter(match, format, filetype)
+  local filetypes = get_filetypes()
+  local adapter = filetypes.get_adapter(filetype)
+  if adapter and adapter.parse_color then
+    return adapter:parse_color(match, format)
+  end
+  -- Fallback to local parse_to_hex
+  return M.parse_to_hex(match, format), nil
+end
 
 ---@class NvimColorPickerColorInfo
 ---@field color string The parsed hex color (without alpha)
@@ -62,15 +96,22 @@ local function extract_alpha(matched, format)
 end
 
 ---Get color at cursor position
+---@param filetype string? Filetype to use for detection (defaults to current buffer)
 ---@return NvimColorPickerColorInfo? color_info Color info or nil if no color found
-function M.get_color_at_cursor()
+function M.get_color_at_cursor(filetype)
   local line = vim.api.nvim_get_current_line()
   local cursor = vim.api.nvim_win_get_cursor(0)
   local row = cursor[1]
   local col = cursor[2] -- 0-indexed
 
+  -- Get filetype if not provided
+  filetype = filetype or vim.bo.filetype
+
+  -- Get patterns for this filetype
+  local patterns = get_patterns_for_filetype(filetype)
+
   -- Try each pattern
-  for _, pat_info in ipairs(PATTERNS) do
+  for _, pat_info in ipairs(patterns) do
     local start_pos = 1
     while true do
       local match_start, match_end = line:find(pat_info.pattern, start_pos)
@@ -82,9 +123,14 @@ function M.get_color_at_cursor()
 
       if col >= start_col and col < end_col then
         local matched = line:sub(match_start, match_end)
-        local hex = M.parse_to_hex(matched, pat_info.format)
+        local hex, alpha = parse_with_adapter(matched, pat_info.format, filetype)
 
         if hex then
+          -- If adapter didn't return alpha, try extract_alpha
+          if alpha == nil then
+            alpha = extract_alpha(matched, pat_info.format)
+          end
+
           return {
             color = hex,
             start_col = start_col,
@@ -92,7 +138,7 @@ function M.get_color_at_cursor()
             format = pat_info.format,
             original = matched,
             line = row,
-            alpha = extract_alpha(matched, pat_info.format),
+            alpha = alpha,
           }
         end
       end
@@ -107,14 +153,19 @@ end
 ---Get all colors in a line
 ---@param line string? Line content (defaults to current line)
 ---@param row number? Line number (defaults to cursor row)
+---@param filetype string? Filetype to use for detection (defaults to current buffer)
 ---@return NvimColorPickerColorInfo[] colors Array of color info
-function M.get_colors_in_line(line, row)
+function M.get_colors_in_line(line, row, filetype)
   line = line or vim.api.nvim_get_current_line()
   row = row or vim.api.nvim_win_get_cursor(0)[1]
+  filetype = filetype or vim.bo.filetype
   local colors = {}
   local covered = {} -- Track which positions are already covered
 
-  for _, pat_info in ipairs(PATTERNS) do
+  -- Get patterns for this filetype
+  local patterns = get_patterns_for_filetype(filetype)
+
+  for _, pat_info in ipairs(patterns) do
     local start_pos = 1
     while true do
       local match_start, match_end = line:find(pat_info.pattern, start_pos)
@@ -132,7 +183,7 @@ function M.get_colors_in_line(line, row)
 
       if not already_covered then
         local matched = line:sub(match_start, match_end)
-        local hex = M.parse_to_hex(matched, pat_info.format)
+        local hex, alpha = parse_with_adapter(matched, pat_info.format, filetype)
 
         if hex then
           table.insert(colors, {
@@ -142,6 +193,7 @@ function M.get_colors_in_line(line, row)
             format = pat_info.format,
             original = matched,
             line = row,
+            alpha = alpha,
           })
           table.insert(covered, { match_start, match_end })
         end

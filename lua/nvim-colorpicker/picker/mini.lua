@@ -653,6 +653,7 @@ function M.pick(opts)
     alpha_enabled = alpha_enabled,
     initial_alpha = initial_alpha,
     forced_mode = opts.forced_mode,
+    target_filetype = opts.target_filetype,
   }
 
   -- Calculate initial grid size (will be recalculated on render)

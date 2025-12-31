@@ -14,8 +14,11 @@ end
 vim.api.nvim_create_user_command('ColorPicker', function(opts)
   local colorpicker = require('nvim-colorpicker')
   local initial_color = opts.args ~= '' and opts.args or nil
+  -- Capture filetype before opening picker for file-aware formatting
+  local filetype = vim.bo.filetype
   colorpicker.pick({
     color = initial_color,
+    target_filetype = filetype,
     on_select = function(result)
       vim.api.nvim_put({ result.color }, 'c', true, true)
     end,
@@ -35,8 +38,11 @@ end, {
 vim.api.nvim_create_user_command('ColorPickerMini', function(opts)
   local colorpicker = require('nvim-colorpicker')
   local initial_color = opts.args ~= '' and opts.args or nil
+  -- Capture filetype before opening picker for file-aware formatting
+  local filetype = vim.bo.filetype
   colorpicker.pick_mini({
     color = initial_color,
+    target_filetype = filetype,
     on_select = function(result)
       vim.api.nvim_put({ result.color }, 'c', true, true)
     end,
@@ -56,8 +62,11 @@ end, {
 vim.api.nvim_create_user_command('ColorPickerMiniSlider', function(opts)
   local colorpicker = require('nvim-colorpicker')
   local initial_color = opts.args ~= '' and opts.args or nil
+  -- Capture filetype before opening picker for file-aware formatting
+  local filetype = vim.bo.filetype
   colorpicker.pick_mini_slider({
     color = initial_color,
+    target_filetype = filetype,
     on_select = function(result)
       vim.api.nvim_put({ result.color }, 'c', true, true)
     end,

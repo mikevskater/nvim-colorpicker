@@ -82,6 +82,7 @@ end
 ---@field initial_alpha number? Initial alpha value (0-100)
 ---@field forced_mode "hsl"|"rgb"|"cmyk"|"hsv"? Force specific color mode
 ---@field custom_controls NvimColorPickerCustomControl[]? Injectable custom controls (toggle/select/number/text)
+---@field target_filetype string? Target filetype for output formatting (auto-detected if not set)
 
 ---Custom control definition for injectable UI elements
 ---@class NvimColorPickerCustomControl

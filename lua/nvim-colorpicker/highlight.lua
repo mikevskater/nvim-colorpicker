@@ -106,14 +106,15 @@ function M.highlight_buffer(bufnr)
     swatch_char = (config.highlight and config.highlight.swatch_char) or '■'
   end
 
-  -- Get all lines
+  -- Get all lines and buffer filetype
   local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+  local filetype = vim.bo[bufnr].filetype
 
   for line_idx, line in ipairs(lines) do
     local line_num = line_idx - 1 -- 0-indexed
 
-    -- Find all colors in line using detect module (has proper deduplication)
-    local colors = detect.get_colors_in_line(line, line_idx)
+    -- Find all colors in line using detect module (filetype-aware detection)
+    local colors = detect.get_colors_in_line(line, line_idx, filetype)
 
     for _, color_info in ipairs(colors) do
       local hl_name = get_or_create_hl(color_info.color)
