@@ -1,0 +1,55 @@
+/* =============================================================================
+ * CSS Color Formats Example
+ * nvim-colorpicker detects and can replace all these formats
+ * ============================================================================= */
+
+:root {
+  /* Hex formats */
+  --primary: #FF5500;
+  --secondary: #3498db;
+  --accent: #2ecc71;
+  --short-hex: #F50;
+  --with-alpha: #FF550080;
+
+  /* RGB formats */
+  --rgb-red: rgb(255, 0, 0);
+  --rgb-green: rgb(0, 255, 0);
+  --rgb-blue: rgb(0, 0, 255);
+  --rgba-semi: rgba(255, 85, 0, 0.5);
+  --rgba-quarter: rgba(52, 152, 219, 0.25);
+
+  /* HSL formats */
+  --hsl-orange: hsl(20, 100%, 50%);
+  --hsl-purple: hsl(270, 60%, 50%);
+  --hsla-fade: hsla(120, 100%, 50%, 0.75);
+}
+
+.button {
+  background-color: #e74c3c;
+  color: #ffffff;
+  border: 2px solid rgb(192, 57, 43);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.button:hover {
+  background-color: hsl(6, 78%, 57%);
+  border-color: hsla(6, 63%, 46%, 0.8);
+}
+
+.gradient {
+  background: linear-gradient(
+    135deg,
+    #667eea 0%,
+    #764ba2 50%,
+    rgba(118, 75, 162, 0.5) 100%
+  );
+}
+
+/* Dark theme colors */
+.dark-theme {
+  --bg-primary: #1a1a2e;
+  --bg-secondary: #16213e;
+  --text-primary: #eaeaea;
+  --text-muted: rgba(234, 234, 234, 0.6);
+  --border: hsl(230, 20%, 25%);
+}
