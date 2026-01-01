@@ -37,6 +37,23 @@ function M.render_info_content(cb)
     { text = "  #", style = "key" },
   })
 
+  -- Show filetype-formatted output if we have an adapter
+  if state._adapter then
+    cb:blank()
+    local output = State.get_formatted_output()
+    local format_name = State.get_output_format()
+    cb:spans({
+      { text = "  Out: ", style = "label" },
+      { text = output, style = "emphasis" },
+    })
+    cb:spans({
+      { text = "       [", style = "muted" },
+      { text = format_name, style = "value" },
+      { text = "]", style = "muted" },
+      { text = "  o", style = "key" },
+    })
+  end
+
   cb:blank()
 
   cb:styled("  " .. string.rep("─", 16), "muted")
@@ -49,8 +66,15 @@ function M.render_info_content(cb)
   local slider_focus = state.slider_focus or 1
 
   -- Track the content line where sliders start (will be adjusted by tab bar offset later)
-  -- Content lines before sliders: blank(1) + Mode(1) + blank(1) + Hex(1) + blank(1) + sep(1) + blank(1) = 7
-  M._slider_content_offset = 7
+  -- Content lines before sliders: blank(1) + Mode(1) + blank(1) + Hex(1) = 4
+  -- If adapter present: + blank(1) + Out(1) + format_line(1) = 7
+  -- Then: + blank(1) + sep(1) + blank(1) = 10 (with adapter) or 7 (without)
+  local base_offset = 4
+  if state._adapter then
+    base_offset = base_offset + 3  -- blank + Out + format_line
+  end
+  base_offset = base_offset + 3  -- blank + sep + blank
+  M._slider_content_offset = base_offset
 
   -- Helper to pad based on display width (handles multi-byte chars like °)
   local function pad_display(str, width)

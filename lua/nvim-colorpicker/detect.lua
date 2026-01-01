@@ -30,19 +30,19 @@ local PATTERNS = {
   { pattern = "#%x%x%x", format = "hex3" },
 }
 
----Get patterns for a filetype
+---Get patterns for a filetype (includes custom patterns from config)
 ---@param filetype string? The filetype
 ---@return table[] patterns Array of pattern definitions
 local function get_patterns_for_filetype(filetype)
   local filetypes = get_filetypes()
-  local adapter = filetypes.get_adapter(filetype)
-  if adapter and adapter.patterns then
-    return adapter.patterns
+  local patterns = filetypes.get_patterns(filetype)
+  if patterns and #patterns > 0 then
+    return patterns
   end
   return PATTERNS
 end
 
----Parse a match using the appropriate adapter
+---Parse a match using the appropriate adapter or custom pattern
 ---@param match string The matched string
 ---@param format string The format type
 ---@param filetype string? The filetype context
@@ -50,9 +50,10 @@ end
 ---@return number? alpha Alpha value 0-100
 local function parse_with_adapter(match, format, filetype)
   local filetypes = get_filetypes()
-  local adapter = filetypes.get_adapter(filetype)
-  if adapter and adapter.parse_color then
-    return adapter:parse_color(match, format)
+  -- This now checks custom patterns first, then adapter
+  local hex, alpha = filetypes.parse_color(match, format, filetype)
+  if hex then
+    return hex, alpha
   end
   -- Fallback to local parse_to_hex
   return M.parse_to_hex(match, format), nil
@@ -249,13 +250,20 @@ end
 ---@param hex string Hex color
 ---@param format string Target format
 ---@param alpha number? Alpha value 0-100 (nil or 100 means opaque)
+---@param filetype string? Filetype context (for custom pattern lookup)
 ---@return string formatted Formatted color string
-function M.format_color(hex, format, alpha)
-  -- Only include alpha in output when it's actually transparent (< 100)
+function M.format_color(hex, format, alpha, filetype)
+  -- Try filetypes module first (handles custom patterns and adapters)
+  local filetypes = get_filetypes()
+  local formatted = filetypes.format_color(hex, filetype, format, alpha)
+  if formatted and formatted ~= hex then
+    return formatted
+  end
+
+  -- Fallback to built-in formatting
   local has_alpha = alpha and alpha < 100
 
   if format == "hex8" or format == "hex" or format == "hex3" then
-    -- Only add alpha suffix if actually transparent
     if has_alpha then
       local alpha_hex = string.format("%02X", math.floor((alpha / 100) * 255 + 0.5))
       return hex .. alpha_hex
@@ -276,7 +284,6 @@ function M.format_color(hex, format, alpha)
     end
     return string.format("hsl(%d, %d%%, %d%%)", math.floor(h + 0.5), math.floor(s + 0.5), math.floor(l + 0.5))
   elseif format == "vim" then
-    -- Preserve guifg= or guibg= prefix (vim doesn't support alpha)
     return hex
   end
 
@@ -290,6 +297,9 @@ end
 function M.replace_color_at_cursor(new_color, color_info, alpha)
   if not color_info then return end
 
+  -- Get current filetype for custom pattern lookup
+  local filetype = vim.bo.filetype
+
   -- Format the new color to match original format
   local formatted
   if color_info.format == "vim" then
@@ -297,7 +307,7 @@ function M.replace_color_at_cursor(new_color, color_info, alpha)
     local prefix = color_info.original:match("^(gui[fb]g=)")
     formatted = (prefix or "") .. new_color
   else
-    formatted = M.format_color(new_color, color_info.format, alpha)
+    formatted = M.format_color(new_color, color_info.format, alpha, filetype)
   end
 
   -- Get the line and replace

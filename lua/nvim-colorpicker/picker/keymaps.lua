@@ -61,6 +61,7 @@ function M.get_controls_definition()
       keys = {
         { key = "m", desc = "Cycle mode (Hex/HSL/RGB/HSV/CMYK)" },
         { key = "f", desc = "Toggle format (standard/decimal)" },
+        { key = "o", desc = "Cycle output format (filetype-aware)" },
       }
     },
     {
@@ -206,6 +207,9 @@ function M.setup_multipanel_keymaps(multi, schedule_render, apply, cancel)
   end
   common_keymaps[get_key("cycle_format", "f")] = function()
     Navigation.cycle_format(schedule_render)
+  end
+  common_keymaps[get_key("cycle_output_format", "o")] = function()
+    State.cycle_output_format(schedule_render)
   end
 
   common_keymaps[get_key("alpha_up", "A")] = function()
@@ -499,6 +503,14 @@ function M.setup_info_keymaps(multi, schedule_render)
   info_keymaps[mode_key] = function()
     action_and_restore(function()
       Navigation.cycle_mode(schedule_render)
+    end)
+  end
+
+  -- Output format cycle with cursor preservation
+  local output_format_key = cfg.cycle_output_format or "o"
+  info_keymaps[output_format_key] = function()
+    action_and_restore(function()
+      State.cycle_output_format(schedule_render)
     end)
   end
 

@@ -6,6 +6,15 @@
 ---@field recent_colors_count number Number of recent colors to track
 ---@field presets string[] Preset palettes to include
 ---@field highlight NvimColorPickerHighlightConfig Inline color highlighting options
+---@field custom_patterns table<string, NvimColorPickerCustomPattern[]> Custom color patterns by filetype
+
+---Custom color pattern definition for user-defined color formats
+---@class NvimColorPickerCustomPattern
+---@field pattern string Lua pattern to match the color (e.g., "MyColor%s*%(%s*%d+%s*,%s*%d+%s*,%s*%d+%s*%)")
+---@field format string Unique format identifier (e.g., "my_color_rgb")
+---@field priority number? Detection priority (higher = checked first, default: 100)
+---@field parse fun(match: string): string?, number? Parse matched string to hex and optional alpha (0-100)
+---@field format_color fun(hex: string, alpha: number?): string Format hex (and optional alpha) back to color string
 
 ---@class NvimColorPickerHighlightConfig
 ---@field enable boolean Enable auto-highlighting on buffer enter
@@ -97,6 +106,31 @@ M.defaults = {
   alpha_enabled = false,
   recent_colors_count = 10,
   presets = {},
+
+  -- Custom color patterns by filetype
+  -- Example:
+  -- custom_patterns = {
+  --   cpp = {
+  --     {
+  --       pattern = "MyColor%s*%(%s*%d+%s*,%s*%d+%s*,%s*%d+%s*%)",
+  --       format = "my_color_rgb",
+  --       priority = 100,
+  --       parse = function(match)
+  --         local r, g, b = match:match("MyColor%s*%(%s*(%d+)%s*,%s*(%d+)%s*,%s*(%d+)%s*%)")
+  --         if r and g and b then
+  --           return string.format("#%02X%02X%02X", tonumber(r), tonumber(g), tonumber(b))
+  --         end
+  --       end,
+  --       format_color = function(hex, alpha)
+  --         local r = tonumber(hex:sub(2, 3), 16)
+  --         local g = tonumber(hex:sub(4, 5), 16)
+  --         local b = tonumber(hex:sub(6, 7), 16)
+  --         return string.format("MyColor(%d, %d, %d)", r, g, b)
+  --       end,
+  --     },
+  --   },
+  -- },
+  custom_patterns = {},
 
   -- Auto-detect movement keys from global Neovim keymaps
   -- If true, checks for remapped h/j/k/l keys and uses those
@@ -203,6 +237,29 @@ end
 ---@return NvimColorPickerKeymaps
 function M.get_keymaps()
   return M.config.keymaps
+end
+
+---Get custom patterns for a filetype
+---@param filetype string The filetype to get patterns for
+---@return NvimColorPickerCustomPattern[] patterns Custom patterns for this filetype
+function M.get_custom_patterns(filetype)
+  local patterns = {}
+
+  -- Add filetype-specific patterns
+  if M.config.custom_patterns[filetype] then
+    for _, p in ipairs(M.config.custom_patterns[filetype]) do
+      table.insert(patterns, p)
+    end
+  end
+
+  -- Add patterns for all filetypes ("_all" key)
+  if M.config.custom_patterns["_all"] then
+    for _, p in ipairs(M.config.custom_patterns["_all"]) do
+      table.insert(patterns, p)
+    end
+  end
+
+  return patterns
 end
 
 return M

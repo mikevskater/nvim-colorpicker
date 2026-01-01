@@ -28,7 +28,7 @@
 local M = {}
 
 ---Plugin version
-M.version = '2.0.1'
+M.version = '2.1.0'
 
 -- Lazy-load modules
 local function get_config()
@@ -147,9 +147,12 @@ function M.pick_at_cursor()
     alpha_enabled = true,  -- Always allow alpha editing
     initial_alpha = color_info.alpha or 100,  -- Use detected alpha or default to 100
     forced_mode = format_to_mode(color_info.format),  -- Match picker mode to detected format
+    target_filetype = vim.bo.filetype,  -- For filetype-aware output formatting
+    original_format = color_info.format,  -- The detected format for output preview
     on_select = function(result)
-      -- result is {color, alpha} - extract the color
-      local new_color = result.color or color_info.color
+      -- Use result.hex (raw hex) not result.color (may be pre-formatted)
+      -- replace_color_at_cursor will format based on color_info.format
+      local new_color = result.hex or result.color or color_info.color
       detect.replace_color_at_cursor(new_color, color_info, result.alpha)
     end,
   })
@@ -243,8 +246,11 @@ function M.pick_mini_at_cursor()
     color = color_info.color,
     alpha = color_info.alpha or 100,  -- Always enable alpha mode
     forced_mode = format_to_mode(color_info.format),  -- Match picker mode to detected format
+    target_filetype = vim.bo.filetype,  -- For filetype-aware output formatting
+    original_format = color_info.format,  -- The detected format for output preview
     on_select = function(result)
-      local new_color = result.color or color_info.color
+      -- Use result.hex (raw hex) not result.color (may be pre-formatted)
+      local new_color = result.hex or result.color or color_info.color
       detect.replace_color_at_cursor(new_color, color_info, result.alpha)
     end,
   })
@@ -281,8 +287,11 @@ function M.pick_mini_slider_at_cursor()
     color = color_info.color,
     alpha = color_info.alpha or 100,
     forced_mode = format_to_mode(color_info.format),  -- Match picker mode to detected format
+    target_filetype = vim.bo.filetype,  -- For filetype-aware output formatting
+    original_format = color_info.format,  -- The detected format for output preview
     on_select = function(result)
-      local new_color = result.color or color_info.color
+      -- Use result.hex (raw hex) not result.color (may be pre-formatted)
+      local new_color = result.hex or result.color or color_info.color
       detect.replace_color_at_cursor(new_color, color_info, result.alpha)
     end,
   })

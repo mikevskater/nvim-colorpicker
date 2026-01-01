@@ -6,6 +6,9 @@ local M = {}
 ---@type table<string, FiletypeAdapter> Registry of adapters by filetype
 M.adapters = {}
 
+---@type table<string, table<string, NvimColorPickerCustomPattern>> Custom patterns indexed by filetype then format
+M._custom_patterns_cache = {}
+
 ---@class FiletypeAdapter
 ---@field filetypes string[] File types this adapter handles
 ---@field patterns PatternDef[] Detection patterns (ordered by priority)
@@ -36,12 +39,61 @@ function M.get_adapter(filetype)
   return M.adapters[filetype] or M.adapters["_default"]
 end
 
----Get patterns for a filetype
+---Get custom pattern definition by format (for parse/format callbacks)
+---@param filetype string The filetype
+---@param format string The format identifier
+---@return NvimColorPickerCustomPattern? pattern The custom pattern or nil
+function M.get_custom_pattern(filetype, format)
+  -- Build cache if not present
+  if not M._custom_patterns_cache[filetype] then
+    M._custom_patterns_cache[filetype] = {}
+    local Config = require('nvim-colorpicker.config')
+    local custom = Config.get_custom_patterns(filetype)
+    for _, p in ipairs(custom) do
+      M._custom_patterns_cache[filetype][p.format] = p
+    end
+  end
+  return M._custom_patterns_cache[filetype][format]
+end
+
+---Clear custom patterns cache (call after config changes)
+function M.clear_custom_patterns_cache()
+  M._custom_patterns_cache = {}
+end
+
+---Get patterns for a filetype (adapter patterns + custom patterns)
 ---@param filetype string? Filetype (defaults to current buffer filetype)
----@return PatternDef[] patterns Detection patterns
+---@return PatternDef[] patterns Detection patterns sorted by priority
 function M.get_patterns(filetype)
+  filetype = filetype or vim.bo.filetype
+  local patterns = {}
+
+  -- Get adapter patterns
   local adapter = M.get_adapter(filetype)
-  return adapter and adapter.patterns or {}
+  if adapter and adapter.patterns then
+    for _, p in ipairs(adapter.patterns) do
+      table.insert(patterns, p)
+    end
+  end
+
+  -- Get custom patterns from config
+  local Config = require('nvim-colorpicker.config')
+  local custom = Config.get_custom_patterns(filetype)
+  for _, p in ipairs(custom) do
+    table.insert(patterns, {
+      pattern = p.pattern,
+      format = p.format,
+      priority = p.priority or 100,
+      _custom = true,  -- Mark as custom for parse/format lookup
+    })
+  end
+
+  -- Sort by priority (higher first)
+  table.sort(patterns, function(a, b)
+    return (a.priority or 0) > (b.priority or 0)
+  end)
+
+  return patterns
 end
 
 ---Format a color for a specific filetype
@@ -51,11 +103,27 @@ end
 ---@param alpha number? Alpha value 0-100
 ---@return string formatted Formatted color string
 function M.format_color(hex, filetype, format, alpha)
+  filetype = filetype or vim.bo.filetype
+  local target_format = format
+
+  -- Check for custom pattern first
+  if target_format then
+    local custom = M.get_custom_pattern(filetype, target_format)
+    if custom and custom.format_color then
+      local ok, result = pcall(custom.format_color, hex, alpha)
+      if ok and result then
+        return result
+      end
+    end
+  end
+
+  -- Fall back to adapter
   local adapter = M.get_adapter(filetype)
   if adapter then
-    local target_format = format or adapter.default_format
+    target_format = target_format or adapter.default_format
     return adapter:format_color(hex, target_format, alpha)
   end
+
   -- Fallback to current format.lua behavior
   local color_format = require('nvim-colorpicker.color.format')
   return color_format.convert_format(hex, format or "hex", alpha) or hex
@@ -68,10 +136,23 @@ end
 ---@return string? hex Parsed hex color
 ---@return number? alpha Alpha value 0-100
 function M.parse_color(match, format, filetype)
+  filetype = filetype or vim.bo.filetype
+
+  -- Check for custom pattern first
+  local custom = M.get_custom_pattern(filetype, format)
+  if custom and custom.parse then
+    local ok, hex, alpha = pcall(custom.parse, match)
+    if ok and hex then
+      return hex, alpha
+    end
+  end
+
+  -- Fall back to adapter
   local adapter = M.get_adapter(filetype)
   if adapter and adapter.parse_color then
     return adapter:parse_color(match, format)
   end
+
   -- Fallback to current format.lua behavior
   local color_format = require('nvim-colorpicker.color.format')
   return color_format.parse_color_string(match)
@@ -105,11 +186,40 @@ function M.get_registered_filetypes()
   return filetypes
 end
 
--- Auto-register default adapter on module load
+-- List of built-in adapters to load
+local BUILTIN_ADAPTERS = {
+  'nvim-colorpicker.filetypes.adapters.default',
+  -- Web
+  'nvim-colorpicker.filetypes.adapters.css',
+  'nvim-colorpicker.filetypes.adapters.javascript',
+  -- Scripting
+  'nvim-colorpicker.filetypes.adapters.python',
+  'nvim-colorpicker.filetypes.adapters.lua',
+  -- Mobile/Game
+  'nvim-colorpicker.filetypes.adapters.kotlin',
+  'nvim-colorpicker.filetypes.adapters.swift',
+  'nvim-colorpicker.filetypes.adapters.dart',
+  'nvim-colorpicker.filetypes.adapters.csharp',
+  -- Systems/Shaders
+  'nvim-colorpicker.filetypes.adapters.shader',
+  'nvim-colorpicker.filetypes.adapters.rust',
+  'nvim-colorpicker.filetypes.adapters.cpp',
+  'nvim-colorpicker.filetypes.adapters.go',
+}
+
+-- Auto-register all built-in adapters on module load
+-- Note: Adapters do NOT self-register to avoid circular dependencies
 local function setup()
-  local ok, default_adapter = pcall(require, 'nvim-colorpicker.filetypes.adapters.default')
-  if ok and default_adapter then
-    M.register(default_adapter)
+  for _, adapter_module in ipairs(BUILTIN_ADAPTERS) do
+    local ok, adapter = pcall(require, adapter_module)
+    if ok and adapter and adapter.filetypes then
+      M.register(adapter)
+    elseif not ok then
+      -- Log error for debugging
+      vim.schedule(function()
+        vim.notify('[nvim-colorpicker] Failed to load adapter: ' .. adapter_module .. '\n' .. tostring(adapter), vim.log.levels.DEBUG)
+      end)
+    end
   end
 end
 

@@ -31,15 +31,11 @@ function M.build_result()
   result.hex = state.current.color
 
   -- Format color according to target filetype if specified
-  local target_ft = state.options.target_filetype
-  if target_ft then
-    local filetypes = get_filetypes()
-    local adapter = filetypes.get_adapter(target_ft)
-    if adapter then
-      -- Use adapter's default format (or color_mode if it matches a supported format)
-      local format = adapter.default_format
-      result.color = adapter:format_color(state.current.color, format, alpha)
-    end
+  local adapter = state._adapter
+  if adapter then
+    -- Use the selected output format (user can cycle through formats with 'o')
+    local format = state.output_format or adapter.default_format
+    result.color = adapter:format_color(state.current.color, format, alpha)
   end
 
   if state.options.custom_controls and #state.options.custom_controls > 0 then
