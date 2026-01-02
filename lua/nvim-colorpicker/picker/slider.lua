@@ -230,9 +230,14 @@ function M.adjust_component(component_index, delta, schedule_render)
   local effective_mode = state.color_mode == "hex" and "hsl" or state.color_mode
   local new_hex = ColorUtils.components_to_hex(values, effective_mode)
 
-  -- Update saved_hsl for hue/saturation changes
-  if effective_mode == "hsl" and (component.key == "h" or component.key == "s") then
-    state.saved_hsl = { h = values.h, s = values.s }
+  -- Update saved_hsl and lightness_virtual for HSL component changes
+  if effective_mode == "hsl" then
+    if component.key == "h" or component.key == "s" then
+      state.saved_hsl = { h = values.h, s = values.s }
+    elseif component.key == "l" then
+      -- Update lightness_virtual so the grid cursor moves
+      state.lightness_virtual = new_value
+    end
   end
 
   State.set_active_color(new_hex)

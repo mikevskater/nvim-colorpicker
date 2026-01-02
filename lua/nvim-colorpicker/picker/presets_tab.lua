@@ -8,6 +8,9 @@ local ContentBuilder = require('nvim-float.content_builder')
 
 local M = {}
 
+-- Store ContentBuilder for element tracking
+M._content_builder = nil
+
 -- ============================================================================
 -- Constants
 -- ============================================================================
@@ -21,9 +24,6 @@ local SWATCH_TEXT = "██"
 
 ---@type number Namespace for swatch extmarks
 local ns = vim.api.nvim_create_namespace('nvim_colorpicker_preset_swatches')
-
----@type table[] Pending extmarks to apply after render
-local pending_extmarks = {}
 
 -- ============================================================================
 -- Swatch Highlight Management
@@ -147,117 +147,34 @@ local function build_flat_items(search)
 end
 
 -- ============================================================================
--- Cursor Management
+-- Element-Based Actions
 -- ============================================================================
 
----Calculate header line offset (tab bar + content header)
----@return number offset Lines before first item
-local function get_header_offset()
-  local state = State.state
-  if not state then return 0 end
-
-  -- Tab bar: 3 lines (blank + tab labels + separator)
-  -- Content: 1 blank line
-  -- Search: 2 lines if active (search indicator + blank)
-  local offset = 3 + 1  -- tab bar + blank
-  if state.presets_search and state.presets_search ~= "" then
-    offset = offset + 2  -- search indicator + blank
-  end
-  return offset
-end
-
----Handle CursorMoved event - sync presets_cursor from buffer cursor
----No re-render needed - cursor position IS the selection indicator
-function M.on_cursor_moved()
-  local state = State.state
-  if not state then return end
-
-  -- Only handle when presets tab is active
-  if state.active_tab ~= "presets" then return end
-
-  local cursor_line = vim.api.nvim_win_get_cursor(0)[1]
-  local header_offset = get_header_offset()
-  local items = build_flat_items(state.presets_search)
-
-  -- Calculate item index from cursor line
-  local item_idx = cursor_line - header_offset
-
-  -- Clamp to valid range
-  if item_idx < 1 then
-    item_idx = 1
-  elseif item_idx > #items then
-    item_idx = #items
-  end
-
-  -- Just update state - no re-render (cursor is the visual indicator)
-  if #items > 0 then
-    state.presets_cursor = item_idx
-  end
-end
-
----Restore cursor position from saved state when switching to presets tab
----@param winid number Window ID of the info panel
-function M.restore_cursor(winid)
-  local state = State.state
-  if not state then return end
-  if not winid or not vim.api.nvim_win_is_valid(winid) then return end
-
-  local items = build_flat_items(state.presets_search)
-  if #items == 0 then return end
-
-  -- Clamp cursor to valid range
-  local cursor_idx = state.presets_cursor or 1
-  if cursor_idx < 1 then cursor_idx = 1 end
-  if cursor_idx > #items then cursor_idx = #items end
-  state.presets_cursor = cursor_idx
-
-  -- Calculate target line: header_offset + cursor_index
-  local target_line = get_header_offset() + cursor_idx
-
-  -- Set cursor position (line, col) - col 0 for start of line
-  pcall(vim.api.nvim_win_set_cursor, winid, { target_line, 0 })
-end
-
--- ============================================================================
--- Presets Navigation (for programmatic use)
--- ============================================================================
-
----Toggle expand/collapse of current item
+---Perform action on an element (called when Enter is pressed)
+---Uses element data directly - no cursor index tracking needed
+---@param element table The element at cursor (from get_element_at_cursor)
 ---@param schedule_render fun() Function to trigger re-render
-function M.toggle_expand(schedule_render)
+function M.action_on_element(element, schedule_render)
   local state = State.state
   if not state then return end
+  if not element or not element.data or not element.data.item then return end
 
-  local items = build_flat_items(state.presets_search)
-  if #items == 0 or state.presets_cursor > #items then return end
+  local item = element.data.item
 
-  local item = items[state.presets_cursor]
   if item.type == "preset" then
+    -- Toggle preset expansion
     local key = item.preset_key
     state.presets_expanded[key] = not state.presets_expanded[key]
+    schedule_render()
+
   elseif item.type == "group" then
+    -- Toggle group expansion
     local key = item.preset_key .. ":" .. item.group_name
     state.presets_expanded[key] = not state.presets_expanded[key]
-  elseif item.type == "color" then
-    -- Selecting a color
-    M.select_current(schedule_render)
-    return
-  end
+    schedule_render()
 
-  schedule_render()
-end
-
----Select the currently highlighted color
----@param schedule_render fun() Function to trigger re-render
-function M.select_current(schedule_render)
-  local state = State.state
-  if not state then return end
-
-  local items = build_flat_items(state.presets_search)
-  if #items == 0 or state.presets_cursor > #items then return end
-
-  local item = items[state.presets_cursor]
-  if item.type == "color" and item.hex then
+  elseif item.type == "color" and item.hex then
+    -- Select the color
     State.set_active_color(item.hex)
 
     -- Update saved HSL for proper grid navigation
@@ -267,9 +184,30 @@ function M.select_current(schedule_render)
     state.saturation_virtual = nil
 
     schedule_render()
-  elseif item.type == "preset" or item.type == "group" then
-    -- Toggle expand for non-color items
-    M.toggle_expand(schedule_render)
+  end
+end
+
+---Toggle expand/collapse on an element
+---@param element table The element at cursor
+---@param schedule_render fun() Function to trigger re-render
+function M.toggle_element(element, schedule_render)
+  local state = State.state
+  if not state then return end
+  if not element or not element.data or not element.data.item then return end
+
+  local item = element.data.item
+
+  if item.type == "preset" then
+    local key = item.preset_key
+    state.presets_expanded[key] = not state.presets_expanded[key]
+    schedule_render()
+  elseif item.type == "group" then
+    local key = item.preset_key .. ":" .. item.group_name
+    state.presets_expanded[key] = not state.presets_expanded[key]
+    schedule_render()
+  elseif item.type == "color" then
+    -- For colors, treat toggle as select
+    M.action_on_element(element, schedule_render)
   end
 end
 
@@ -328,7 +266,7 @@ end
 -- Presets Tab Rendering
 -- ============================================================================
 
----Render the presets tab content (without tab bar)
+---Render the presets tab content to existing ContentBuilder
 ---@param cb ContentBuilder The content builder to add content to
 function M.render_presets_content(cb)
   local state = State.state
@@ -336,11 +274,7 @@ function M.render_presets_content(cb)
 
   local items = build_flat_items(state.presets_search)
 
-  -- Track line index for extmarks (starts after tab bar: 3 lines)
-  local line_idx = 3
-
   cb:blank()
-  line_idx = line_idx + 1
 
   -- Search indicator if active
   if state.presets_search and state.presets_search ~= "" then
@@ -348,9 +282,7 @@ function M.render_presets_content(cb)
       { text = "  Search: ", style = "muted" },
       { text = state.presets_search, style = "value" },
     })
-    line_idx = line_idx + 1
     cb:blank()
-    line_idx = line_idx + 1
   end
 
   if #items == 0 then
@@ -359,9 +291,6 @@ function M.render_presets_content(cb)
       cb:styled("  Try a different search", "muted")
     end
   else
-    -- Clear pending extmarks
-    pending_extmarks = {}
-
     -- Calculate max color name length for alignment
     local max_name_len = 0
     for _, item in ipairs(items) do
@@ -371,37 +300,72 @@ function M.render_presets_content(cb)
     end
 
     -- Render all items - cursor position is the selection indicator
-    for _, item in ipairs(items) do
+    for i, item in ipairs(items) do
       local indent = string.rep("  ", item.indent)
 
       if item.type == "preset" then
         local expand_char = item.expanded and "v" or ">"
-        cb:styled(string.format("  %s%s %s (%d)",
-          indent, expand_char, item.preset_name, item.count), "header")
-        line_idx = line_idx + 1
+        -- Track preset as interactive element
+        cb:spans({
+          {
+            text = string.format("  %s%s %s (%d)", indent, expand_char, item.preset_name, item.count),
+            style = "header",
+            track = {
+              name = "preset_" .. i,
+              type = "action",
+              row_based = true,
+              hover_style = "emphasis",
+              data = {
+                index = i,
+                item = item,
+              },
+            },
+          },
+        })
 
       elseif item.type == "group" then
         local expand_char = item.expanded and "v" or ">"
-        cb:styled(string.format("  %s%s %s (%d)",
-          indent, expand_char, item.group_name, item.count), "value")
-        line_idx = line_idx + 1
+        -- Track group as interactive element
+        cb:spans({
+          {
+            text = string.format("  %s%s %s (%d)", indent, expand_char, item.group_name, item.count),
+            style = "value",
+            track = {
+              name = "preset_" .. i,
+              type = "action",
+              row_based = true,
+              hover_style = "emphasis",
+              data = {
+                index = i,
+                item = item,
+              },
+            },
+          },
+        })
 
       elseif item.type == "color" then
         -- Pad color name to align swatches
         local padded_name = item.color_name .. string.rep(" ", max_name_len - #item.color_name)
 
-        -- Render WITHOUT swatch (swatch added via extmark)
+        -- Track color as interactive element (store hex in data for swatch)
         cb:spans({
-          { text = string.format("  %s", indent), style = "normal" },
+          {
+            text = string.format("  %s", indent),
+            style = "normal",
+            track = {
+              name = "preset_" .. i,
+              type = "action",
+              row_based = true,
+              hover_style = "emphasis",
+              data = {
+                index = i,
+                item = item,
+                hex = item.hex,  -- Store hex for swatch extmarks
+              },
+            },
+          },
           { text = padded_name, style = "normal" },
         })
-
-        -- Store extmark data for this line
-        table.insert(pending_extmarks, {
-          line = line_idx,
-          hex = item.hex,
-        })
-        line_idx = line_idx + 1
       end
     end
   end
@@ -420,6 +384,7 @@ function M.render_presets_content(cb)
 end
 
 ---Render the complete presets panel (tab bar + presets content)
+---Uses single ContentBuilder so element positions match buffer positions
 ---@param multi_state MultiPanelState
 ---@return string[] lines
 ---@return table[] highlights
@@ -429,58 +394,49 @@ function M.render_presets_panel(multi_state)
 
   local Tabs = require('nvim-colorpicker.picker.tabs')
 
-  local all_lines = {}
-  local all_highlights = {}
+  -- Single ContentBuilder for everything - element positions are correct
+  local cb = ContentBuilder.new()
 
-  -- Add tab bar
-  local tab_lines, tab_highlights = Tabs.render_tab_bar()
-  for _, line in ipairs(tab_lines) do
-    table.insert(all_lines, line)
-  end
-  for _, hl in ipairs(tab_highlights) do
-    table.insert(all_highlights, hl)
-  end
-  local line_offset = #all_lines
+  -- Add tab bar first
+  Tabs.render_tab_bar_to(cb)
 
   -- Add presets content
-  local cb = ContentBuilder.new()
   M.render_presets_content(cb)
 
-  local content_lines = cb:build_lines()
-  local content_highlights = cb:build_highlights()
+  -- Store ContentBuilder for element tracking
+  M._content_builder = cb
 
-  for _, line in ipairs(content_lines) do
-    table.insert(all_lines, line)
-  end
-  for _, hl in ipairs(content_highlights) do
-    table.insert(all_highlights, {
-      line = hl.line + line_offset,
-      col_start = hl.col_start,
-      col_end = hl.col_end,
-      hl_group = hl.hl_group,
-    })
-  end
+  return cb:build_lines(), cb:build_highlights()
+end
 
-  return all_lines, all_highlights
+---Get the stored ContentBuilder (for element tracking integration)
+---@return ContentBuilder?
+function M.get_content_builder()
+  return M._content_builder
 end
 
 ---Apply swatch extmarks to the info panel buffer
----Called after the buffer content is set to add virtual text swatches
+---Uses element data from ContentBuilder to find color items and their rows
 ---@param bufnr number The buffer number to apply extmarks to
 function M.apply_swatch_extmarks(bufnr)
   if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then return end
+  if not M._content_builder then return end
 
   -- Clear previous extmarks
   vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
 
-  -- Apply pending extmarks as virtual text (cursor-highlight resistant)
-  for _, extmark in ipairs(pending_extmarks) do
-    local hl_name = get_swatch_highlight(extmark.hex)
+  -- Get elements from ContentBuilder and apply swatches
+  local registry = M._content_builder:get_registry()
+  if not registry then return end
 
-    vim.api.nvim_buf_set_extmark(bufnr, ns, extmark.line, 0, {
-      virt_text = { { " " .. SWATCH_TEXT, hl_name } },
-      virt_text_pos = "eol",  -- End of line
-    })
+  for _, element in registry:iter() do
+    if element.data and element.data.hex then
+      local hl_name = get_swatch_highlight(element.data.hex)
+      vim.api.nvim_buf_set_extmark(bufnr, ns, element.row, 0, {
+        virt_text = { { " " .. SWATCH_TEXT, hl_name } },
+        virt_text_pos = "eol",
+      })
+    end
   end
 end
 

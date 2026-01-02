@@ -124,11 +124,9 @@ end
 -- Tab Bar Rendering
 -- ============================================================================
 
----Render the tab bar
----@return string[] lines The rendered lines
----@return table[] highlights The highlight definitions
-function M.render_tab_bar()
-  local cb = ContentBuilder.new()
+---Render the tab bar to an existing ContentBuilder
+---@param cb ContentBuilder The content builder to add to
+function M.render_tab_bar_to(cb)
   local active_tab = M.get_current_tab()
 
   -- Build tab bar spans
@@ -154,7 +152,14 @@ function M.render_tab_bar()
   cb:blank()
   cb:spans(spans)
   cb:styled("  " .. string.rep("─", 18), "muted")
+end
 
+---Render the tab bar (legacy - returns lines/highlights)
+---@return string[] lines The rendered lines
+---@return table[] highlights The highlight definitions
+function M.render_tab_bar()
+  local cb = ContentBuilder.new()
+  M.render_tab_bar_to(cb)
   return cb:build_lines(), cb:build_highlights()
 end
 

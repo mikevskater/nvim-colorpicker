@@ -259,9 +259,6 @@ end
 -- History Tab Keymaps
 -- ============================================================================
 
--- Autocmd ID for history CursorMoved handler
-local history_cursor_autocmd = nil
-
 ---Setup history-specific keymaps when history tab is active
 ---@param multi MultiPanelState
 ---@param schedule_render fun() Function to schedule a render
@@ -271,65 +268,60 @@ function M.setup_history_keymaps(multi, schedule_render)
 
   local HistoryTab = get_history_tab()
 
+  -- Helper to get element at cursor
+  local function get_element()
+    local info_panel = multi.panels and multi.panels.info
+    if info_panel and info_panel.float then
+      return info_panel.float:get_element_at_cursor()
+    end
+    return nil
+  end
+
   local history_keymaps = {}
 
-  -- Navigation uses default Neovim movement - CursorMoved autocmd syncs selection
+  -- Select uses element at cursor directly
   history_keymaps["<CR>"] = function()
-    HistoryTab.select_current(schedule_render)
+    local element = get_element()
+    if element then
+      HistoryTab.select_element(element, schedule_render)
+    end
   end
+
+  -- Delete uses element at cursor directly
   history_keymaps["d"] = function()
-    HistoryTab.delete_current(schedule_render)
+    local element = get_element()
+    if element then
+      HistoryTab.delete_element(element, schedule_render)
+    end
   end
+
   history_keymaps["c"] = function()
     HistoryTab.clear_all(schedule_render)
   end
 
-  -- Apply these keymaps to the info panel (which shows history content when history tab is active)
   multi:set_panel_keymaps("info", history_keymaps)
 
-  -- Setup CursorMoved autocmd for info panel to sync selection with cursor
+  -- Setup ContentBuilder for element tracking (on every render)
   local info_buf = multi:get_panel_buffer("info")
-  local info_win = multi:get_panel_window("info")
   if info_buf and vim.api.nvim_buf_is_valid(info_buf) then
-    -- Apply swatch extmarks (virtual text, cursor-highlight resistant)
     HistoryTab.apply_swatch_extmarks(info_buf)
 
-    -- Clean up any existing autocmd
-    if history_cursor_autocmd then
-      pcall(vim.api.nvim_del_autocmd, history_cursor_autocmd)
+    local cb = HistoryTab.get_content_builder()
+    if cb then
+      multi:set_panel_content_builder("info", cb)
     end
-
-    history_cursor_autocmd = vim.api.nvim_create_autocmd("CursorMoved", {
-      buffer = info_buf,
-      callback = function()
-        HistoryTab.on_cursor_moved()
-      end,
-    })
-
-    -- Restore cursor position from saved state
-    HistoryTab.restore_cursor(info_win)
   end
 end
 
 ---Clear history-specific keymaps (when switching away from history tab)
 ---@param multi MultiPanelState
 function M.clear_history_keymaps(multi)
-  -- Reset to empty keymaps for the info panel
   multi:set_panel_keymaps("info", {})
-
-  -- Clean up CursorMoved autocmd
-  if history_cursor_autocmd then
-    pcall(vim.api.nvim_del_autocmd, history_cursor_autocmd)
-    history_cursor_autocmd = nil
-  end
 end
 
 -- ============================================================================
 -- Presets Tab Keymaps
 -- ============================================================================
-
--- Autocmd ID for presets CursorMoved handler
-local presets_cursor_autocmd = nil
 
 ---Setup presets-specific keymaps when presets tab is active
 ---@param multi MultiPanelState
@@ -340,56 +332,72 @@ function M.setup_presets_keymaps(multi, schedule_render)
 
   local PresetsTab = get_presets_tab()
 
+  -- Helper to get element at cursor
+  local function get_element()
+    local info_panel = multi.panels and multi.panels.info
+    if info_panel and info_panel.float then
+      return info_panel.float:get_element_at_cursor()
+    end
+    return nil
+  end
+
   local presets_keymaps = {}
 
-  -- Navigation uses default Neovim movement - CursorMoved autocmd syncs selection
+  -- Actions use element at cursor directly
   presets_keymaps["<CR>"] = function()
-    PresetsTab.select_current(schedule_render)
+    local element = get_element()
+    if element then
+      PresetsTab.action_on_element(element, schedule_render)
+    end
   end
+
   presets_keymaps["l"] = function()
-    PresetsTab.toggle_expand(schedule_render)
+    local element = get_element()
+    if element then
+      PresetsTab.toggle_element(element, schedule_render)
+    end
   end
+
   presets_keymaps["h"] = function()
-    -- Collapse current or parent
-    PresetsTab.toggle_expand(schedule_render)
+    local element = get_element()
+    if element then
+      PresetsTab.toggle_element(element, schedule_render)
+    end
   end
+
   presets_keymaps["zo"] = function()
-    PresetsTab.toggle_expand(schedule_render)
+    local element = get_element()
+    if element then
+      PresetsTab.toggle_element(element, schedule_render)
+    end
   end
+
   presets_keymaps["zc"] = function()
-    PresetsTab.toggle_expand(schedule_render)
+    local element = get_element()
+    if element then
+      PresetsTab.toggle_element(element, schedule_render)
+    end
   end
+
   presets_keymaps["zR"] = function()
     PresetsTab.expand_all(schedule_render)
   end
+
   presets_keymaps["zM"] = function()
     PresetsTab.collapse_all(schedule_render)
   end
 
-  -- Apply these keymaps to the info panel
   multi:set_panel_keymaps("info", presets_keymaps)
 
-  -- Setup CursorMoved autocmd for info panel to sync selection with cursor
+  -- Setup ContentBuilder for element tracking (on every render)
   local info_buf = multi:get_panel_buffer("info")
-  local info_win = multi:get_panel_window("info")
   if info_buf and vim.api.nvim_buf_is_valid(info_buf) then
-    -- Apply swatch extmarks (virtual text, cursor-highlight resistant)
     PresetsTab.apply_swatch_extmarks(info_buf)
 
-    -- Clean up any existing autocmd
-    if presets_cursor_autocmd then
-      pcall(vim.api.nvim_del_autocmd, presets_cursor_autocmd)
+    local cb = PresetsTab.get_content_builder()
+    if cb then
+      multi:set_panel_content_builder("info", cb)
     end
-
-    presets_cursor_autocmd = vim.api.nvim_create_autocmd("CursorMoved", {
-      buffer = info_buf,
-      callback = function()
-        PresetsTab.on_cursor_moved()
-      end,
-    })
-
-    -- Restore cursor position from saved state
-    PresetsTab.restore_cursor(info_win)
   end
 end
 
@@ -397,20 +405,11 @@ end
 ---@param multi MultiPanelState
 function M.clear_presets_keymaps(multi)
   multi:set_panel_keymaps("info", {})
-
-  -- Clean up CursorMoved autocmd
-  if presets_cursor_autocmd then
-    pcall(vim.api.nvim_del_autocmd, presets_cursor_autocmd)
-    presets_cursor_autocmd = nil
-  end
 end
 
 -- ============================================================================
 -- Info Tab (Sliders) Keymaps
 -- ============================================================================
-
--- Autocmd ID for info CursorMoved handler
-local info_cursor_autocmd = nil
 
 ---Setup info-tab-specific keymaps when info tab is active (for slider adjustment)
 ---@param multi MultiPanelState
@@ -425,6 +424,15 @@ function M.setup_info_keymaps(multi, schedule_render)
 
   local info_keymaps = {}
   local Navigation = require('nvim-colorpicker.picker.navigation')
+
+  -- Helper to get element at cursor
+  local function get_element()
+    local info_panel = multi.panels and multi.panels.info
+    if info_panel and info_panel.float then
+      return info_panel.float:get_element_at_cursor()
+    end
+    return nil
+  end
 
   -- Helper to get info window and cursor
   local function get_cursor_info()
@@ -442,15 +450,18 @@ function M.setup_info_keymaps(multi, schedule_render)
     end)
   end
 
-  -- Wrapper to adjust slider and restore cursor position
-  local function adjust_and_restore(delta)
+  -- Adjust slider based on element at cursor
+  local function adjust_slider(delta)
     local count = vim.v.count1
     local info_win, cursor_pos = get_cursor_info()
+    local element = get_element()
 
-    Slider.adjust_component(state.slider_focus, delta * count, function()
-      schedule_render()
-      restore_cursor_after_render(info_win, cursor_pos)
-    end)
+    if element then
+      InfoTab.adjust_slider_element(element, delta * count, function()
+        schedule_render()
+        restore_cursor_after_render(info_win, cursor_pos)
+      end)
+    end
   end
 
   -- Wrapper for actions that trigger re-render (format toggle, mode cycle)
@@ -460,7 +471,7 @@ function M.setup_info_keymaps(multi, schedule_render)
     restore_cursor_after_render(info_win, cursor_pos)
   end
 
-  -- Step adjustment keys adjust the focused slider component
+  -- Step adjustment keys adjust the slider at cursor
   local step_down_key = cfg.step_down or "-"
   local step_up_keys = cfg.step_up or { "+", "=" }
 
@@ -468,12 +479,12 @@ function M.setup_info_keymaps(multi, schedule_render)
   if type(step_down_key) == "table" then
     for _, k in ipairs(step_down_key) do
       info_keymaps[k] = function()
-        adjust_and_restore(-1)
+        adjust_slider(-1)
       end
     end
   else
     info_keymaps[step_down_key] = function()
-      adjust_and_restore(-1)
+      adjust_slider(-1)
     end
   end
 
@@ -481,12 +492,12 @@ function M.setup_info_keymaps(multi, schedule_render)
   if type(step_up_keys) == "table" then
     for _, k in ipairs(step_up_keys) do
       info_keymaps[k] = function()
-        adjust_and_restore(1)
+        adjust_slider(1)
       end
     end
   else
     info_keymaps[step_up_keys] = function()
-      adjust_and_restore(1)
+      adjust_slider(1)
     end
   end
 
@@ -514,27 +525,15 @@ function M.setup_info_keymaps(multi, schedule_render)
     end)
   end
 
-  -- Apply these keymaps to the info panel
   multi:set_panel_keymaps("info", info_keymaps)
 
-  -- Setup CursorMoved autocmd for info panel to sync slider focus with cursor
+  -- Setup ContentBuilder for element tracking (on every render)
   local info_buf = multi:get_panel_buffer("info")
-  local info_win = multi:get_panel_window("info")
   if info_buf and vim.api.nvim_buf_is_valid(info_buf) then
-    -- Clean up any existing autocmd
-    if info_cursor_autocmd then
-      pcall(vim.api.nvim_del_autocmd, info_cursor_autocmd)
+    local cb = InfoTab.get_content_builder()
+    if cb then
+      multi:set_panel_content_builder("info", cb)
     end
-
-    info_cursor_autocmd = vim.api.nvim_create_autocmd("CursorMoved", {
-      buffer = info_buf,
-      callback = function()
-        InfoTab.on_cursor_moved()
-      end,
-    })
-
-    -- Restore cursor position to focused slider
-    InfoTab.restore_cursor(info_win)
   end
 end
 
@@ -542,12 +541,6 @@ end
 ---@param multi MultiPanelState
 function M.clear_info_keymaps(multi)
   multi:set_panel_keymaps("info", {})
-
-  -- Clean up CursorMoved autocmd
-  if info_cursor_autocmd then
-    pcall(vim.api.nvim_del_autocmd, info_cursor_autocmd)
-    info_cursor_autocmd = nil
-  end
 end
 
 return M

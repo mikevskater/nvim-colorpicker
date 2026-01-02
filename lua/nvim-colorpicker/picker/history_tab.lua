@@ -8,6 +8,9 @@ local ContentBuilder = require('nvim-float.content_builder')
 
 local M = {}
 
+-- Store ContentBuilder for element tracking
+M._content_builder = nil
+
 -- ============================================================================
 -- Constants
 -- ============================================================================
@@ -25,9 +28,6 @@ local SWATCH_TEXT = "█████"
 ---@type number Namespace for swatch extmarks
 local ns = vim.api.nvim_create_namespace('nvim_colorpicker_history_swatches')
 
----@type table[] Pending extmarks to apply after render
-local pending_extmarks = {}
-
 -- ============================================================================
 -- History Highlight Management
 -- ============================================================================
@@ -39,14 +39,10 @@ local created_highlights = {}
 ---@param hex string The hex color
 ---@return string hl_group The highlight group name
 local function get_swatch_highlight(hex)
-  -- Normalize hex to ensure consistent format
   hex = ColorUtils.normalize_hex(hex)
   local hl_name = "NvimColorPickerHistory_" .. hex:gsub("#", "")
 
-  -- Only create if not already cached
   if not created_highlights[hl_name] then
-    -- Use fg color for block chars (VHS compatible)
-    -- Note: bg would fill entire row, so we only use fg
     vim.api.nvim_set_hl(0, hl_name, { fg = hex })
     created_highlights[hl_name] = true
   end
@@ -55,118 +51,50 @@ local function get_swatch_highlight(hex)
 end
 
 -- ============================================================================
--- Cursor Management
+-- Element-Based Actions
 -- ============================================================================
 
----Calculate header line offset (tab bar + content header)
----@return number offset Lines before first history item
-local function get_header_offset()
-  -- Tab bar: 3 lines (blank + tab labels + separator)
-  -- Content: 1 blank line + "Recent (N)" header + 1 blank line = 3 lines
-  return 3 + 3  -- 6 total lines before first item
-end
-
----Handle CursorMoved event - sync history_cursor from buffer cursor
----No re-render needed - cursor position IS the selection indicator
-function M.on_cursor_moved()
-  local state = State.state
-  if not state then return end
-
-  -- Only handle when history tab is active
-  if state.active_tab ~= "history" then return end
-
-  local cursor_line = vim.api.nvim_win_get_cursor(0)[1]
-  local header_offset = get_header_offset()
-  local history = History.get_recent(MAX_DISPLAY_ITEMS)
-
-  -- Calculate item index from cursor line
-  local item_idx = cursor_line - header_offset
-
-  -- Clamp to valid range
-  if item_idx < 1 then
-    item_idx = 1
-  elseif item_idx > #history then
-    item_idx = #history
-  end
-
-  -- Just update state - no re-render (cursor is the visual indicator)
-  if #history > 0 then
-    state.history_cursor = item_idx
-  end
-end
-
----Restore cursor position from saved state when switching to history tab
----@param winid number Window ID of the info panel
-function M.restore_cursor(winid)
-  local state = State.state
-  if not state then return end
-  if not winid or not vim.api.nvim_win_is_valid(winid) then return end
-
-  local history = History.get_recent(MAX_DISPLAY_ITEMS)
-  if #history == 0 then return end
-
-  -- Clamp cursor to valid range
-  local cursor_idx = state.history_cursor or 1
-  if cursor_idx < 1 then cursor_idx = 1 end
-  if cursor_idx > #history then cursor_idx = #history end
-  state.history_cursor = cursor_idx
-
-  -- Calculate target line: header_offset + cursor_index
-  local target_line = get_header_offset() + cursor_idx
-
-  -- Set cursor position (line, col) - col 0 for start of line
-  pcall(vim.api.nvim_win_set_cursor, winid, { target_line, 0 })
-end
-
--- ============================================================================
--- History Navigation (for programmatic use)
--- ============================================================================
-
----Select the currently highlighted history item
+---Select a history item from element data (called when Enter is pressed)
+---Uses element data directly - no cursor index tracking needed
+---@param element table The element at cursor (from get_element_at_cursor)
 ---@param schedule_render fun() Function to trigger re-render
-function M.select_current(schedule_render)
+function M.select_element(element, schedule_render)
   local state = State.state
   if not state then return end
+  if not element or not element.data or not element.data.item then return end
 
-  local history = History.get_recent(MAX_DISPLAY_ITEMS)
-  if #history == 0 then return end
+  local item = element.data.item
 
-  local selected_item = history[state.history_cursor]
-  if selected_item then
-    State.set_active_color(selected_item.hex)
+  State.set_active_color(item.hex)
 
-    -- Restore alpha from history
-    if selected_item.alpha then
-      state.alpha = selected_item.alpha
-    end
-
-    -- Restore color mode from history (only if not locked by forced_mode)
-    if selected_item.format and not state.options.forced_mode then
-      state.color_mode = selected_item.format
-    end
-
-    -- Update saved HSL for proper grid navigation
-    local h, s, _ = ColorUtils.hex_to_hsl(selected_item.hex)
-    state.saved_hsl = { h = h, s = s }
-    state.lightness_virtual = nil
-    state.saturation_virtual = nil
-
-    schedule_render()
+  -- Restore alpha from history
+  if item.alpha then
+    state.alpha = item.alpha
   end
+
+  -- Restore color mode from history (only if not locked by forced_mode)
+  if item.format and not state.options.forced_mode then
+    state.color_mode = item.format
+  end
+
+  -- Update saved HSL for proper grid navigation
+  local h, s, _ = ColorUtils.hex_to_hsl(item.hex)
+  state.saved_hsl = { h = h, s = s }
+  state.lightness_virtual = nil
+  state.saturation_virtual = nil
+
+  schedule_render()
 end
 
----Delete the currently highlighted history item
+---Delete a history item from element data
+---@param element table The element at cursor (from get_element_at_cursor)
 ---@param schedule_render fun() Function to trigger re-render
-function M.delete_current(schedule_render)
+function M.delete_element(element, schedule_render)
   local state = State.state
   if not state then return end
+  if not element or not element.data or not element.data.item then return end
 
-  local history = History.get_recent(MAX_DISPLAY_ITEMS)
-  if #history == 0 then return end
-
-  -- Get the item to delete
-  local to_delete = history[state.history_cursor]
-  if not to_delete then return end
+  local to_delete = element.data.item
 
   -- Get all colors and remove the selected one (compare by hex)
   local all_colors = History.get_recent()
@@ -183,12 +111,6 @@ function M.delete_current(schedule_render)
     History.add_recent(new_colors[i].hex, new_colors[i].alpha, new_colors[i].format)
   end
 
-  -- Adjust cursor if needed
-  local new_history = History.get_recent(MAX_DISPLAY_ITEMS)
-  if state.history_cursor > #new_history then
-    state.history_cursor = math.max(1, #new_history)
-  end
-
   schedule_render()
 end
 
@@ -199,8 +121,6 @@ function M.clear_all(schedule_render)
   if not state then return end
 
   History.clear_recent()
-  state.history_cursor = 1
-
   schedule_render()
 end
 
@@ -208,7 +128,7 @@ end
 -- History Tab Rendering
 -- ============================================================================
 
----Render the history tab content (without tab bar)
+---Render the history tab content to existing ContentBuilder
 ---@param cb ContentBuilder The content builder to add content to
 function M.render_history_content(cb)
   local state = State.state
@@ -216,11 +136,7 @@ function M.render_history_content(cb)
 
   local history = History.get_recent(MAX_DISPLAY_ITEMS)
 
-  -- Track line index for extmarks (starts after tab bar: 3 lines)
-  local line_idx = 3
-
   cb:blank()
-  line_idx = line_idx + 1
 
   if #history == 0 then
     cb:styled("  No recent colors", "muted")
@@ -229,12 +145,7 @@ function M.render_history_content(cb)
     cb:styled("  them to history.", "muted")
   else
     cb:styled(string.format("  Recent (%d)", #history), "header")
-    line_idx = line_idx + 1
     cb:blank()
-    line_idx = line_idx + 1
-
-    -- Clear pending extmarks
-    pending_extmarks = {}
 
     -- Pre-calculate display hex values and find max length for alignment
     local display_items = {}
@@ -261,19 +172,27 @@ function M.render_history_content(cb)
         format_indicator = " [" .. item.format:upper() .. "]"
       end
 
+      -- Track history item as interactive element (store hex in data for swatch)
       cb:spans({
-        { text = "  ", style = "normal" },
+        {
+          text = "  ",
+          style = "normal",
+          track = {
+            name = "history_" .. i,
+            type = "action",
+            row_based = true,
+            hover_style = "emphasis",
+            data = {
+              index = i,
+              item = item,
+              hex = item.hex,  -- Store hex for swatch extmarks
+            },
+          },
+        },
         { text = string.format("%2d ", i), style = "value" },
         { text = padded_hex, style = "value" },
         { text = format_indicator, style = "muted" },
       })
-
-      -- Store extmark data for this line
-      table.insert(pending_extmarks, {
-        line = line_idx,
-        hex = item.hex,
-      })
-      line_idx = line_idx + 1
     end
   end
 
@@ -293,6 +212,7 @@ function M.render_history_content(cb)
 end
 
 ---Render the complete history panel (tab bar + history content)
+---Uses single ContentBuilder so element positions match buffer positions
 ---@param multi_state MultiPanelState
 ---@return string[] lines
 ---@return table[] highlights
@@ -302,58 +222,49 @@ function M.render_history_panel(multi_state)
 
   local Tabs = require('nvim-colorpicker.picker.tabs')
 
-  local all_lines = {}
-  local all_highlights = {}
-
-  -- Add tab bar
-  local tab_lines, tab_highlights = Tabs.render_tab_bar()
-  for _, line in ipairs(tab_lines) do
-    table.insert(all_lines, line)
-  end
-  for _, hl in ipairs(tab_highlights) do
-    table.insert(all_highlights, hl)
-  end
-  local line_offset = #all_lines
-
-  -- Add history content (swatch highlights are inline via cb:spans with hl_group)
+  -- Single ContentBuilder for everything - element positions are correct
   local cb = ContentBuilder.new()
+
+  -- Add tab bar first
+  Tabs.render_tab_bar_to(cb)
+
+  -- Add history content
   M.render_history_content(cb)
 
-  local content_lines = cb:build_lines()
-  local content_highlights = cb:build_highlights()
+  -- Store ContentBuilder for element tracking
+  M._content_builder = cb
 
-  for _, line in ipairs(content_lines) do
-    table.insert(all_lines, line)
-  end
-  for _, hl in ipairs(content_highlights) do
-    table.insert(all_highlights, {
-      line = hl.line + line_offset,
-      col_start = hl.col_start,
-      col_end = hl.col_end,
-      hl_group = hl.hl_group,
-    })
-  end
+  return cb:build_lines(), cb:build_highlights()
+end
 
-  return all_lines, all_highlights
+---Get the stored ContentBuilder (for element tracking integration)
+---@return ContentBuilder?
+function M.get_content_builder()
+  return M._content_builder
 end
 
 ---Apply swatch extmarks to the info panel buffer
----Called after the buffer content is set to add virtual text swatches
+---Uses element data from ContentBuilder to find history items and their rows
 ---@param bufnr number The buffer number to apply extmarks to
 function M.apply_swatch_extmarks(bufnr)
   if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then return end
+  if not M._content_builder then return end
 
   -- Clear previous extmarks
   vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
 
-  -- Apply pending extmarks as virtual text (cursor-highlight resistant)
-  for _, extmark in ipairs(pending_extmarks) do
-    local hl_name = get_swatch_highlight(extmark.hex)
+  -- Get elements from ContentBuilder and apply swatches
+  local registry = M._content_builder:get_registry()
+  if not registry then return end
 
-    vim.api.nvim_buf_set_extmark(bufnr, ns, extmark.line, 0, {
-      virt_text = { { " " .. SWATCH_TEXT, hl_name } },
-      virt_text_pos = "eol",  -- End of line
-    })
+  for _, element in registry:iter() do
+    if element.data and element.data.hex then
+      local hl_name = get_swatch_highlight(element.data.hex)
+      vim.api.nvim_buf_set_extmark(bufnr, ns, element.row, 0, {
+        virt_text = { { " " .. SWATCH_TEXT, hl_name } },
+        virt_text_pos = "eol",
+      })
+    end
   end
 end
 

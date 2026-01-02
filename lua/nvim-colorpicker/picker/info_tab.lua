@@ -9,11 +9,14 @@ local ContentBuilder = require('nvim-float.content_builder')
 
 local M = {}
 
+-- Store ContentBuilder for element tracking
+M._content_builder = nil
+
 -- ============================================================================
 -- Info Tab Content Rendering
 -- ============================================================================
 
----Render the info tab content (without tab bar - pure content only)
+---Render the info tab content to existing ContentBuilder
 ---@param cb ContentBuilder The content builder to add content to
 function M.render_info_content(cb)
   local state = State.state
@@ -60,21 +63,9 @@ function M.render_info_content(cb)
 
   cb:blank()
 
-  -- Render sliders instead of static values
+  -- Render sliders (element tracking handles hover highlighting)
   local components = Slider.get_components(state.color_mode, state.alpha_enabled)
   local values = Slider.get_component_values(current_hex, state.color_mode, state.alpha)
-  local slider_focus = state.slider_focus or 1
-
-  -- Track the content line where sliders start (will be adjusted by tab bar offset later)
-  -- Content lines before sliders: blank(1) + Mode(1) + blank(1) + Hex(1) = 4
-  -- If adapter present: + blank(1) + Out(1) + format_line(1) = 7
-  -- Then: + blank(1) + sep(1) + blank(1) = 10 (with adapter) or 7 (without)
-  local base_offset = 4
-  if state._adapter then
-    base_offset = base_offset + 3  -- blank + Out + format_line
-  end
-  base_offset = base_offset + 3  -- blank + sep + blank
-  M._slider_content_offset = base_offset
 
   -- Helper to pad based on display width (handles multi-byte chars like °)
   local function pad_display(str, width)
@@ -89,14 +80,23 @@ function M.render_info_content(cb)
     local formatted = ColorUtils.format_value(value, comp.unit, state.value_format)
     local value_padded = pad_display(formatted, 5)
 
-    -- Highlight focused slider
-    local is_focused = (i == slider_focus) and state.focused_panel == "info"
-    local label_style = is_focused and "emphasis" or "label"
-    local slider_style = is_focused and "emphasis" or "value"
-
+    -- Track slider row as interactive element (hover_style handles highlighting)
     cb:spans({
-      { text = "  " .. comp.label .. ": ", style = label_style },
-      { text = slider_str, style = slider_style },
+      {
+        text = "  " .. comp.label .. ": ",
+        style = "label",
+        track = {
+          name = "slider_" .. comp.key,
+          type = "action",
+          row_based = true,
+          hover_style = "emphasis",
+          data = {
+            slider_index = i,
+            component = comp,
+          },
+        },
+      },
+      { text = slider_str, style = "value" },
       { text = " " .. value_padded, style = "value" },
     })
   end
@@ -165,7 +165,7 @@ end
 -- ============================================================================
 
 ---Render the complete info panel (tab bar + info content)
----Called when info tab is active
+---Uses single ContentBuilder so element positions match buffer positions
 ---@param multi_state MultiPanelState
 ---@return string[] lines
 ---@return table[] highlights
@@ -175,105 +175,55 @@ function M.render_info_panel(multi_state)
 
   local Tabs = require('nvim-colorpicker.picker.tabs')
 
-  local all_lines = {}
-  local all_highlights = {}
+  -- Single ContentBuilder for everything - element positions are correct
+  local cb = ContentBuilder.new()
 
-  -- Add tab bar
-  local tab_lines, tab_highlights = Tabs.render_tab_bar()
-  for _, line in ipairs(tab_lines) do
-    table.insert(all_lines, line)
-  end
-  for _, hl in ipairs(tab_highlights) do
-    table.insert(all_highlights, hl)
-  end
-  local line_offset = #all_lines
+  -- Add tab bar first
+  Tabs.render_tab_bar_to(cb)
 
   -- Add info content
-  local cb = ContentBuilder.new()
   M.render_info_content(cb)
 
-  -- Calculate slider start line: tab_bar_lines + content_offset
-  -- Cursor is 1-indexed, so first slider at line (line_offset + _slider_content_offset + 1)
-  -- For get_slider_from_cursor: slider_line = cursor - _slider_start_line, should give 1 for first slider
-  -- So _slider_start_line = line_offset + _slider_content_offset
-  M._slider_start_line = line_offset + (M._slider_content_offset or 7)
+  -- Store ContentBuilder for element tracking
+  M._content_builder = cb
 
-  local content_lines = cb:build_lines()
-  local content_highlights = cb:build_highlights()
+  return cb:build_lines(), cb:build_highlights()
+end
 
-  for _, line in ipairs(content_lines) do
-    table.insert(all_lines, line)
-  end
-  for _, hl in ipairs(content_highlights) do
-    table.insert(all_highlights, {
-      line = hl.line + line_offset,
-      col_start = hl.col_start,
-      col_end = hl.col_end,
-      hl_group = hl.hl_group,
-    })
-  end
-
-  return all_lines, all_highlights
+---Get the stored ContentBuilder (for element tracking integration)
+---@return ContentBuilder?
+function M.get_content_builder()
+  return M._content_builder
 end
 
 -- ============================================================================
--- Slider Cursor Tracking
+-- Element-Based Slider Actions
 -- ============================================================================
 
--- Line offset where sliders start (set during render)
-M._slider_start_line = 10  -- Default, updated during render
-M._slider_content_offset = 7  -- Lines in content before first slider
-
----Get the slider index from cursor position
----@param cursor_line number 1-indexed cursor line
----@return number? slider_index 1-indexed slider index, or nil if not on a slider
-function M.get_slider_from_cursor(cursor_line)
+---Adjust slider value based on element at cursor
+---@param element table The element at cursor (from get_element_at_cursor)
+---@param delta number Amount to adjust (+1 or -1)
+---@param schedule_render fun() Function to trigger re-render
+function M.adjust_slider_element(element, delta, schedule_render)
   local state = State.state
-  if not state then return nil end
+  if not state then return end
 
-  local components = Slider.get_components(state.color_mode, state.alpha_enabled)
-  local slider_count = #components
-
-  -- Calculate which slider the cursor is on
-  local slider_line = cursor_line - M._slider_start_line
-  if slider_line >= 1 and slider_line <= slider_count then
-    return slider_line
+  if not element or not element.data or not element.data.slider_index then
+    return
   end
 
+  local slider_index = element.data.slider_index
+  Slider.adjust_component(slider_index, delta, schedule_render)
+end
+
+---Get slider index from element (for visual highlighting)
+---@param element table? The element at cursor
+---@return number? slider_index
+function M.get_slider_index_from_element(element)
+  if element and element.data and element.data.slider_index then
+    return element.data.slider_index
+  end
   return nil
-end
-
----Called when cursor moves in info panel
-function M.on_cursor_moved()
-  local state = State.state
-  if not state or state.active_tab ~= "info" then return end
-
-  local cursor = vim.api.nvim_win_get_cursor(0)
-  local line = cursor[1]
-
-  local slider_idx = M.get_slider_from_cursor(line)
-  if slider_idx then
-    state.slider_focus = slider_idx
-  end
-end
-
----Get the line number for a slider index
----@param slider_index number 1-indexed slider index
----@return number line 1-indexed line number
-function M.get_line_for_slider(slider_index)
-  return M._slider_start_line + slider_index - 1
-end
-
----Restore cursor to the focused slider
----@param win number Window handle
-function M.restore_cursor(win)
-  local state = State.state
-  if not state or not win or not vim.api.nvim_win_is_valid(win) then return end
-
-  local slider_focus = state.slider_focus or 1
-  local line = M.get_line_for_slider(slider_focus)
-
-  pcall(vim.api.nvim_win_set_cursor, win, { line, 0 })
 end
 
 return M
