@@ -150,10 +150,25 @@ function M.pick_at_cursor()
     target_filetype = vim.bo.filetype,  -- For filetype-aware output formatting
     original_format = color_info.format,  -- The detected format for output preview
     on_select = function(result)
-      -- Use result.hex (raw hex) not result.color (may be pre-formatted)
-      -- replace_color_at_cursor will format based on color_info.format
-      local new_color = result.hex or result.color or color_info.color
-      detect.replace_color_at_cursor(new_color, color_info, result.alpha)
+      -- result.color is formatted by build_result() using user's selected output format (via 'o' key)
+      -- result.hex is the raw hex value for reference
+      -- If adapter formatted result.color, use it directly; otherwise use replace_color_at_cursor
+      if result.color and result.color ~= result.hex then
+        -- Adapter formatted the color - use it directly
+        local formatted = result.color
+        -- Special case for vim format: preserve guifg=/guibg= prefix
+        if color_info.format == "vim" then
+          local prefix = color_info.original:match("^(gui[fb]g=)")
+          formatted = (prefix or "") .. result.hex
+        end
+        local line = vim.api.nvim_get_current_line()
+        local new_line = line:sub(1, color_info.start_col) .. formatted .. line:sub(color_info.end_col + 1)
+        vim.api.nvim_set_current_line(new_line)
+      else
+        -- No adapter or same format - use replace_color_at_cursor for formatting
+        local new_color = result.hex or result.color or color_info.color
+        detect.replace_color_at_cursor(new_color, color_info, result.alpha)
+      end
     end,
   })
 end
@@ -249,9 +264,21 @@ function M.pick_mini_at_cursor()
     target_filetype = vim.bo.filetype,  -- For filetype-aware output formatting
     original_format = color_info.format,  -- The detected format for output preview
     on_select = function(result)
-      -- Use result.hex (raw hex) not result.color (may be pre-formatted)
-      local new_color = result.hex or result.color or color_info.color
-      detect.replace_color_at_cursor(new_color, color_info, result.alpha)
+      -- result.color is formatted by build_result() using user's selected output format (via 'o' key)
+      if result.color and result.color ~= result.hex then
+        -- Adapter formatted the color - use it directly
+        local formatted = result.color
+        if color_info.format == "vim" then
+          local prefix = color_info.original:match("^(gui[fb]g=)")
+          formatted = (prefix or "") .. result.hex
+        end
+        local line = vim.api.nvim_get_current_line()
+        local new_line = line:sub(1, color_info.start_col) .. formatted .. line:sub(color_info.end_col + 1)
+        vim.api.nvim_set_current_line(new_line)
+      else
+        local new_color = result.hex or result.color or color_info.color
+        detect.replace_color_at_cursor(new_color, color_info, result.alpha)
+      end
     end,
   })
 end
@@ -290,9 +317,21 @@ function M.pick_mini_slider_at_cursor()
     target_filetype = vim.bo.filetype,  -- For filetype-aware output formatting
     original_format = color_info.format,  -- The detected format for output preview
     on_select = function(result)
-      -- Use result.hex (raw hex) not result.color (may be pre-formatted)
-      local new_color = result.hex or result.color or color_info.color
-      detect.replace_color_at_cursor(new_color, color_info, result.alpha)
+      -- result.color is formatted by build_result() using user's selected output format (via 'o' key)
+      if result.color and result.color ~= result.hex then
+        -- Adapter formatted the color - use it directly
+        local formatted = result.color
+        if color_info.format == "vim" then
+          local prefix = color_info.original:match("^(gui[fb]g=)")
+          formatted = (prefix or "") .. result.hex
+        end
+        local line = vim.api.nvim_get_current_line()
+        local new_line = line:sub(1, color_info.start_col) .. formatted .. line:sub(color_info.end_col + 1)
+        vim.api.nvim_set_current_line(new_line)
+      else
+        local new_color = result.hex or result.color or color_info.color
+        detect.replace_color_at_cursor(new_color, color_info, result.alpha)
+      end
     end,
   })
 end
