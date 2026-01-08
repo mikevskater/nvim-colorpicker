@@ -10,7 +10,9 @@ if vim.fn.has('nvim-0.9') == 0 then
   return
 end
 
--- Commands
+-- ============================================================================
+-- User Commands
+-- ============================================================================
 vim.api.nvim_create_user_command('ColorPicker', function(opts)
   local colorpicker = require('nvim-colorpicker')
   local initial_color = opts.args ~= '' and opts.args or nil
@@ -219,3 +221,75 @@ end, {
   end,
   desc = 'Run nvim-colorpicker tests (ui/run/last)',
 })
+
+-- ============================================================================
+-- <Plug> Mappings
+-- ============================================================================
+-- These allow users to create their own keymaps without hardcoding commands.
+-- Usage: vim.keymap.set("n", "<leader>cp", "<Plug>(colorpicker)")
+
+-- Full picker
+vim.keymap.set("n", "<Plug>(colorpicker)", function()
+  local colorpicker = require("nvim-colorpicker")
+  local filetype = vim.bo.filetype
+  colorpicker.pick({
+    target_filetype = filetype,
+    on_select = function(result)
+      vim.api.nvim_put({ result.color }, 'c', true, true)
+    end,
+  })
+end, { desc = "Open color picker" })
+
+vim.keymap.set("n", "<Plug>(colorpicker-at-cursor)", function()
+  require("nvim-colorpicker").pick_at_cursor()
+end, { desc = "Pick and replace color at cursor" })
+
+-- Mini picker
+vim.keymap.set("n", "<Plug>(colorpicker-mini)", function()
+  local colorpicker = require("nvim-colorpicker")
+  local filetype = vim.bo.filetype
+  colorpicker.pick_mini({
+    target_filetype = filetype,
+    on_select = function(result)
+      vim.api.nvim_put({ result.color }, 'c', true, true)
+    end,
+  })
+end, { desc = "Open mini color picker" })
+
+vim.keymap.set("n", "<Plug>(colorpicker-mini-at-cursor)", function()
+  require("nvim-colorpicker").pick_mini_at_cursor()
+end, { desc = "Pick and replace color at cursor with mini picker" })
+
+-- Slider mode
+vim.keymap.set("n", "<Plug>(colorpicker-slider)", function()
+  local colorpicker = require("nvim-colorpicker")
+  local filetype = vim.bo.filetype
+  colorpicker.pick_mini_slider({
+    target_filetype = filetype,
+    on_select = function(result)
+      vim.api.nvim_put({ result.color }, 'c', true, true)
+    end,
+  })
+end, { desc = "Open color picker in slider mode" })
+
+vim.keymap.set("n", "<Plug>(colorpicker-slider-at-cursor)", function()
+  require("nvim-colorpicker").pick_mini_slider_at_cursor()
+end, { desc = "Pick and replace color at cursor with slider mode" })
+
+-- Convert color at cursor
+vim.keymap.set("n", "<Plug>(colorpicker-convert-hex)", function()
+  require("nvim-colorpicker").convert_at_cursor("hex")
+end, { desc = "Convert color at cursor to hex" })
+
+vim.keymap.set("n", "<Plug>(colorpicker-convert-rgb)", function()
+  require("nvim-colorpicker").convert_at_cursor("rgb")
+end, { desc = "Convert color at cursor to rgb" })
+
+vim.keymap.set("n", "<Plug>(colorpicker-convert-hsl)", function()
+  require("nvim-colorpicker").convert_at_cursor("hsl")
+end, { desc = "Convert color at cursor to hsl" })
+
+-- Highlighting
+vim.keymap.set("n", "<Plug>(colorpicker-highlight-toggle)", function()
+  require("nvim-colorpicker").toggle_highlight()
+end, { desc = "Toggle color highlighting in buffer" })

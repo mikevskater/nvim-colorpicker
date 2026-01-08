@@ -2,7 +2,7 @@
 
 A powerful HSL-based color picker for Neovim with visual grid navigation, multiple picker interfaces, real-time preview and more.
 
-**Version:** 2.0.0
+**Version:** 2.1.0
 
 <p align="center">
   <img src="assets/hero.gif" alt="nvim-colorpicker demo" width="800">
@@ -12,6 +12,9 @@ A powerful HSL-based color picker for Neovim with visual grid navigation, multip
 
 - **HSL Color Grid** - Interactive visual grid for selecting hue and lightness with vim-style navigation
 - **Multiple Picker Interfaces** - Full multipanel picker with tabs, compact mini picker, and slider mode
+- **Multi-Language Support** - Detect colors in 12+ languages: CSS, JS/TS, Go, C++, Rust, Kotlin, Swift, Dart, C#, Python, Lua, GLSL/HLSL
+- **Language-Aware Formatting** - Output colors in native format (QColor, color.RGBA, vec3, etc.)
+- **Custom Color Patterns** - Define your own color functions and classes for detection
 - **Color Detection** - Automatically detect and replace colors in HEX, RGB, HSL, HSLA formats
 - **Buffer Highlighting** - Real-time color highlighting in your code (background, foreground, or virtualtext)
 - **Rich Preset Library** - 600+ colors from Web, Material, and Tailwind palettes
@@ -30,20 +33,53 @@ A powerful HSL-based color picker for Neovim with visual grid navigation, multip
 ### lazy.nvim (Recommended)
 
 ```lua
+-- Minimal (uses defaults)
 {
   "mikevskater/nvim-colorpicker",
-  dependencies = {
-    "mikevskater/nvim-float",
+  dependencies = { "mikevskater/nvim-float" },
+  opts = {},
+}
+
+-- With custom options (recommended)
+{
+  "mikevskater/nvim-colorpicker",
+  dependencies = { "mikevskater/nvim-float" },
+  opts = {
+    alpha_enabled = true,
+    highlight = {
+      enable = true,
+      filetypes = { "css", "scss", "html" },
+    },
   },
-  config = function()
-    require("nvim-colorpicker").setup()
-  end,
+}
+
+-- With lazy-loading on command
+{
+  "mikevskater/nvim-colorpicker",
+  dependencies = { "mikevskater/nvim-float" },
+  cmd = { "ColorPicker", "ColorPickerAtCursor", "ColorPickerMini" },
+  opts = {},
+}
+
+-- Full example with keymaps (using <Plug> mappings)
+{
+  "mikevskater/nvim-colorpicker",
+  dependencies = { "mikevskater/nvim-float" },
+  cmd = { "ColorPicker", "ColorPickerMini", "ColorHighlight" },
   keys = {
-    { "<leader>cp", "<cmd>ColorPicker<cr>", desc = "Color Picker" },
-    { "<leader>cm", "<cmd>ColorPickerMini<cr>", desc = "Mini Color Picker" },
+    { "<leader>cp", "<Plug>(colorpicker)", desc = "Color Picker" },
+    { "<leader>cc", "<Plug>(colorpicker-at-cursor)", desc = "Pick at Cursor" },
+    { "<leader>cm", "<Plug>(colorpicker-mini)", desc = "Mini Picker" },
+    { "<leader>ch", "<Plug>(colorpicker-highlight-toggle)", desc = "Toggle Highlighting" },
+  },
+  opts = {
+    alpha_enabled = true,
+    presets = { "web", "tailwind" },
   },
 }
 ```
+
+> **Note:** When using `opts`, lazy.nvim automatically calls `require("nvim-colorpicker").setup(opts)` for you.
 
 ### packer.nvim
 
@@ -55,6 +91,14 @@ use {
     require("nvim-colorpicker").setup()
   end,
 }
+```
+
+### Health Check
+
+After installation, verify everything is working:
+
+```vim
+:checkhealth nvim-colorpicker
 ```
 
 ## Quick Start
@@ -195,24 +239,66 @@ require("nvim-colorpicker").setup({
 })
 ```
 
+**Define Custom Color Patterns:**
+
+```lua
+require("nvim-colorpicker").setup({
+  custom_patterns = {
+    -- Add patterns for specific filetypes
+    cpp = {
+      {
+        pattern = "MyColor%s*%(%s*%d+%s*,%s*%d+%s*,%s*%d+%s*%)",
+        format = "my_color_rgb",
+        priority = 100,  -- Higher = checked first
+        parse = function(match)
+          local r, g, b = match:match("MyColor%s*%(%s*(%d+)%s*,%s*(%d+)%s*,%s*(%d+)%s*%)")
+          if r and g and b then
+            return string.format("#%02X%02X%02X", tonumber(r), tonumber(g), tonumber(b))
+          end
+        end,
+        format_color = function(hex, alpha)
+          local r = tonumber(hex:sub(2, 3), 16)
+          local g = tonumber(hex:sub(4, 5), 16)
+          local b = tonumber(hex:sub(6, 7), 16)
+          return string.format("MyColor(%d, %d, %d)", r, g, b)
+        end,
+      },
+    },
+    -- "_all" applies to all filetypes
+    _all = {
+      {
+        pattern = "theme%.color%s*=%s*\"#%x%x%x%x%x%x\"",
+        format = "theme_color",
+        parse = function(match)
+          return match:match("\"(#%x%x%x%x%x%x)\"")
+        end,
+        format_color = function(hex)
+          return string.format('theme.color = "%s"', hex)
+        end,
+      },
+    },
+  },
+})
+```
+
 ## Commands
 
 ### Color Picker Commands
 
 | Command | Description |
 |---------|-------------|
-| `:ColorPicker [color]` | Open full color picker. Optional initial color (hex/rgb/hsl). |
+| `:ColorPicker [color]` | Open full color picker. Inserts selected color at cursor. |
 | `:ColorPickerAtCursor` | Detect color at cursor, open picker, replace on confirm. |
-| `:ColorPickerMini [color]` | Open compact inline picker. Optional initial color. |
+| `:ColorPickerMini [color]` | Open compact inline picker. Inserts selected color at cursor. |
 | `:ColorPickerMiniAtCursor` | Detect color at cursor, open mini picker for replacement. |
-| `:ColorPickerMiniSlider [color]` | Open mini picker in slider mode (no grid). |
+| `:ColorPickerMiniSlider [color]` | Open mini picker in slider mode. Inserts selected color at cursor. |
 | `:ColorPickerMiniSliderAtCursor` | Detect color at cursor, open mini slider for replacement. |
 
 ### Conversion and Clipboard Commands
 
 | Command | Description |
 |---------|-------------|
-| `:ColorConvert [format]` | Convert color at cursor. Formats: `hex`, `rgb`, `hsl`, `hsv`. |
+| `:ColorConvert [format]` | Convert color at cursor (preserves alpha). Formats: `hex`, `rgb`, `hsl`, `hsv`. |
 | `:ColorYank [format]` | Copy color at cursor to clipboard. |
 | `:ColorPaste` | Paste color from clipboard and insert at cursor. |
 
@@ -235,6 +321,32 @@ require("nvim-colorpicker").setup({
 | `:ColorHistory [count]` | Display recent colors (default: 10). |
 | `:ColorSearch <query>` | Search presets by color name. |
 | `:ColorPickerTest` | Run tests and show results in UI. |
+
+### `<Plug>` Mappings
+
+For users who prefer to create their own keymaps:
+
+| Plug Mapping | Description |
+|--------------|-------------|
+| `<Plug>(colorpicker)` | Open full color picker |
+| `<Plug>(colorpicker-at-cursor)` | Pick and replace color at cursor |
+| `<Plug>(colorpicker-mini)` | Open mini color picker |
+| `<Plug>(colorpicker-mini-at-cursor)` | Mini picker at cursor |
+| `<Plug>(colorpicker-slider)` | Open picker in slider mode |
+| `<Plug>(colorpicker-slider-at-cursor)` | Slider mode at cursor |
+| `<Plug>(colorpicker-convert-hex)` | Convert color at cursor to hex |
+| `<Plug>(colorpicker-convert-rgb)` | Convert color at cursor to rgb |
+| `<Plug>(colorpicker-convert-hsl)` | Convert color at cursor to hsl |
+| `<Plug>(colorpicker-highlight-toggle)` | Toggle buffer highlighting |
+
+**Example:**
+
+```lua
+vim.keymap.set("n", "<leader>cp", "<Plug>(colorpicker)")
+vim.keymap.set("n", "<leader>cc", "<Plug>(colorpicker-at-cursor)")
+vim.keymap.set("n", "<leader>cm", "<Plug>(colorpicker-mini)")
+vim.keymap.set("n", "<leader>ch", "<Plug>(colorpicker-highlight-toggle)")
+```
 
 ## Keymaps
 
@@ -259,6 +371,7 @@ require("nvim-colorpicker").setup({
 |------|--------|
 | `m` | Cycle mode: HEX → HSL → RGB → HSV → CMYK |
 | `f` | Toggle format: standard/decimal |
+| `o` | Cycle output format (language-aware) |
 
 ### Actions
 
@@ -313,8 +426,11 @@ local colorpicker = require("nvim-colorpicker")
 colorpicker.pick({
   color = "#ff5500",
   alpha_enabled = true,
+  target_filetype = "go",        -- Format output for Go (optional)
+  original_format = "color_rgba", -- Preserve original format (optional)
   on_select = function(result)
-    print("Selected: " .. result.color)
+    print("Selected: " .. result.color)  -- Formatted for filetype
+    print("Raw hex: " .. result.hex)     -- Always #RRGGBB
   end,
   on_cancel = function()
     print("Cancelled")
@@ -529,6 +645,8 @@ local current = colorpicker.get_color()
 
 ## Color Format Support
 
+### Universal Formats
+
 | Format | Pattern | Example |
 |--------|---------|---------|
 | HEX (6-digit) | `#RRGGBB` | `#FF5500` |
@@ -539,6 +657,54 @@ local current = colorpicker.get_color()
 | HSL | `hsl(h, s%, l%)` | `hsl(20, 100%, 50%)` |
 | HSLA | `hsla(h, s%, l%, a)` | `hsla(20, 100%, 50%, 0.5)` |
 | Vim highlight | `guifg=#RRGGBB` | `guifg=#FF5500` |
+
+### Language-Specific Formats
+
+<details>
+<summary>Click to expand supported language formats</summary>
+
+| Language | Formats Detected |
+|----------|------------------|
+| **CSS/SCSS/LESS** | `hex`, `rgb()`, `rgba()`, `hsl()`, `hsla()`, `hwb()`, `lab()`, `lch()`, `oklch()` |
+| **JavaScript/TypeScript** | `hex`, `rgb()`, `hsl()`, `0xRRGGBB` |
+| **Go** | `color.RGBA{r,g,b,a}`, `color.NRGBA{}`, `{r,g,b,a}`, `0xRRGGBB`, `0xAARRGGBB` |
+| **C++/Qt** | `QColor("#hex")`, `QColor(r,g,b)`, `QColor::fromRgbF()`, `{r,g,b,a}`, `{0.5f,0.3f,0.1f}`, `0xRRGGBB` |
+| **Rust** | `Color::rgb()`, `Color::rgba()`, `Color::srgb()`, `Srgba::new()`, `hex!()`, `0xRRGGBB` |
+| **Kotlin/Android** | `Color(0xAARRGGBB)`, `Color.parseColor()`, `0xAARRGGBB` |
+| **Swift/SwiftUI** | `Color(red:green:blue:)`, `UIColor()`, `NSColor()`, `#colorLiteral()` |
+| **Dart/Flutter** | `Color(0xAARRGGBB)`, `Color.fromARGB()`, `Color.fromRGBO()`, `Colors.name` |
+| **C#/Unity** | `Color(r,g,b,a)`, `Color32(r,g,b,a)`, `new Color()`, `Color.name` |
+| **Python** | `(r,g,b)`, `(r,g,b,a)`, `pygame.Color()`, `hex` strings |
+| **Lua/Love2D** | `{r,g,b}`, `{r,g,b,a}`, `love.graphics` colors |
+| **GLSL/HLSL/Metal** | `vec3()`, `vec4()`, `float3()`, `float4()` |
+
+</details>
+
+<details>
+<summary>Multi-Language Color Detection Demo</summary>
+<p align="center">
+  <img src="assets/multi-language.gif" alt="Multi-language color detection demo" width="640">
+</p>
+
+The demo shows:
+1. Detecting and editing `color.RGBA{}` in Go
+2. Detecting and editing `QColor()` in C++
+3. Detecting and editing float struct `{0.384f, 0.000f, 0.933f}` in C++
+4. Detecting and editing `Color::srgb()` in Rust
+</details>
+
+<details>
+<summary>Output Format Cycling Demo</summary>
+<p align="center">
+  <img src="assets/output-format.gif" alt="Output format cycling demo" width="640">
+</p>
+
+The demo shows:
+1. Opening the picker on a Go `color.RGBA{}` color
+2. Pressing `o` to cycle through available formats (color_rgba, color_nrgba, struct, hex_numeric, etc.)
+3. Selecting a different output format before applying
+4. The color is replaced using the selected format
+</details>
 
 <details>
 <summary>Format Conversion Demo</summary>

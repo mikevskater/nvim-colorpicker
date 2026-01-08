@@ -30,6 +30,9 @@ local M = {}
 ---Plugin version
 M.version = '2.1.0'
 
+---Track if setup has been called
+local _setup_complete = false
+
 -- Lazy-load modules
 local function get_config()
   return require('nvim-colorpicker.config')
@@ -69,6 +72,14 @@ function M.setup(opts)
   get_config().setup(opts)
   -- Setup highlight module (will enable auto-highlight if configured)
   get_highlight().setup()
+  -- Mark setup as complete
+  _setup_complete = true
+end
+
+---Check if setup has been called
+---@return boolean
+function M.is_setup()
+  return _setup_complete
 end
 
 ---@class NvimColorPickerPickOptions
