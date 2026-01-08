@@ -10,7 +10,7 @@ local Format = require('nvim-colorpicker.picker.format')
 local Slider = require('nvim-colorpicker.picker.slider')
 local ColorUtils = require('nvim-colorpicker.color')
 local Config = require('nvim-colorpicker.config')
-local UiFloat = require('nvim-float.float')
+local UiFloat = require('nvim-float.window')
 
 local M = {}
 

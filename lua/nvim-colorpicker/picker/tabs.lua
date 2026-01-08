@@ -2,7 +2,7 @@
 ---@brief Tab system for the color picker right panel
 
 local State = require('nvim-colorpicker.picker.state')
-local ContentBuilder = require('nvim-float.content_builder')
+local ContentBuilder = require('nvim-float.content')
 
 local M = {}
 

@@ -17,7 +17,7 @@ local function ensure_deps()
       return false
     end
     nf = float
-    ContentBuilder = require("nvim-float.content_builder")
+    ContentBuilder = require("nvim-float.content")
   end
   return true
 end

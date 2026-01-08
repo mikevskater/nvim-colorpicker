@@ -5,7 +5,7 @@ local State = require('nvim-colorpicker.picker.state')
 local ColorUtils = require('nvim-colorpicker.color')
 local Format = require('nvim-colorpicker.picker.format')
 local Slider = require('nvim-colorpicker.picker.slider')
-local ContentBuilder = require('nvim-float.content_builder')
+local ContentBuilder = require('nvim-float.content')
 
 local M = {}
 

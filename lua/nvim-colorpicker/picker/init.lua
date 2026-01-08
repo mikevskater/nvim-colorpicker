@@ -15,7 +15,7 @@ local Keymaps = require('nvim-colorpicker.picker.keymaps')
 local Actions = require('nvim-colorpicker.picker.actions')
 local ColorUtils = require('nvim-colorpicker.color')
 local Config = require('nvim-colorpicker.config')
-local UiFloat = require('nvim-float.float')
+local UiFloat = require('nvim-float.window')
 local MultiPanel = require('nvim-float.float.multipanel')
 
 local ColorPicker = {}
