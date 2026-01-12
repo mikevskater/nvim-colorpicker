@@ -2,7 +2,7 @@
 
 Author:  MikeVSkater
 License: MIT
-Version: 1.9.5
+Version: 2.1.0
 
 ==============================================================================
 CONTENTS                                           *nvim-colorpicker-contents*
@@ -15,8 +15,10 @@ CONTENTS                                           *nvim-colorpicker-contents*
     6. Keymaps ............................... |nvim-colorpicker-keymaps|
     7. Lua API ............................... |nvim-colorpicker-api|
     8. Highlight Groups ...................... |nvim-colorpicker-highlights|
-    9. External Integration .................. |nvim-colorpicker-integration|
-   10. Troubleshooting ....................... |nvim-colorpicker-troubleshooting|
+    9. Supported Languages ................... |nvim-colorpicker-languages|
+   10. Custom Patterns ....................... |nvim-colorpicker-custom-patterns|
+   11. External Integration .................. |nvim-colorpicker-integration|
+   12. Troubleshooting ....................... |nvim-colorpicker-troubleshooting|
 
 ==============================================================================
 1. INTRODUCTION                                       *nvim-colorpicker-intro*
@@ -27,6 +29,9 @@ grid navigation, multiple picker interfaces, real-time preview and more.
 Features:~
 - HSL Color Grid - Interactive visual grid for selecting hue and lightness
 - Multiple Picker Interfaces - Full multipanel, mini grid, and mini slider mode
+- Multi-Language Support - Detect colors in 12+ languages (see |nvim-colorpicker-languages|)
+- Language-Aware Formatting - Output in native format (QColor, color.RGBA, vec3, etc.)
+- Custom Patterns - Define your own color functions (see |nvim-colorpicker-custom-patterns|)
 - Color Detection - Automatically detect and replace colors in code
 - Buffer Highlighting - Real-time color highlighting (background/foreground/virtualtext)
 - Rich Preset Library - 600+ colors from Web, Material, and Tailwind palettes
@@ -155,8 +160,9 @@ Highlight options:~
 5. COMMANDS                                       *nvim-colorpicker-commands*
 
                                                                *:ColorPicker*
-:ColorPicker [color]         Open full color picker. 
+:ColorPicker [color]         Open full color picker.
                                - Optional initial color.
+                               - Inserts selected color at cursor on confirm.
 
                                                        *:ColorPickerAtCursor*
 :ColorPickerAtCursor         Detect color at cursor, open fullsize picker,
@@ -165,14 +171,16 @@ Highlight options:~
                                                            *:ColorPickerMini*
 :ColorPickerMini [color]     Open compact inline picker.
                                - Optional initial color.
+                               - Inserts selected color at cursor on confirm.
 
                                                    *:ColorPickerMiniAtCursor*
 :ColorPickerMiniAtCursor     Detect color at cursor, open mini grid picker.
 
                                                      *:ColorPickerMiniSlider*
-:ColorPickerMiniSlider [color] 
+:ColorPickerMiniSlider [color]
                              Open mini picker in slider mode.
 			       - Optional initial color.
+			       - Inserts selected color at cursor on confirm.
 
                                              *:ColorPickerMiniSliderAtCursor*
 :ColorPickerMiniSliderAtCursor  
@@ -180,7 +188,7 @@ Highlight options:~
 			       starting at color under cursor.
 
                                                               *:ColorConvert*
-:ColorConvert [format]       Convert color at cursor. 
+:ColorConvert [format]       Convert color at cursor (preserves alpha).
                                Formats: hex, rgb, hsl, hsv.
 
                                                                  *:ColorYank*
@@ -232,6 +240,7 @@ Step Size:~
 Color Mode:~
   m              Cycle mode: HEX → HSL → RGB → HSV → CMYK
   f              Toggle format: standard/decimal
+  o              Cycle output format (language-aware)
 
                                               *nvim-colorpicker-keymaps-alpha*
 Alpha (when enabled):~
@@ -496,7 +505,95 @@ Buffer highlight modes:~
   `virtualtext`    Color swatch character displayed before the color
 
 ==============================================================================
-9. EXTERNAL INTEGRATION                         *nvim-colorpicker-integration*
+9. SUPPORTED LANGUAGES                           *nvim-colorpicker-languages*
+
+nvim-colorpicker supports color detection and formatting for 12+ languages.
+When editing colors, press `o` to cycle through available output formats.
+
+                                            *nvim-colorpicker-languages-list*
+Language adapters:~
+
+  CSS/SCSS/LESS      hex, rgb(), rgba(), hsl(), hsla(), hwb(), lab(),
+                     lch(), oklch()
+
+  JavaScript/TS      hex, rgb(), hsl(), 0xRRGGBB
+
+  Go                 color.RGBA{r,g,b,a}, color.NRGBA{}, {r,g,b,a},
+                     0xRRGGBB, 0xAARRGGBB
+
+  C++/Qt             QColor("#hex"), QColor(r,g,b), QColor::fromRgbF(),
+                     {r,g,b,a}, {0.5f,0.3f,0.1f}, 0xRRGGBB
+
+  Rust               Color::rgb(), Color::rgba(), Color::srgb(),
+                     Srgba::new(), hex!(), 0xRRGGBB
+
+  Kotlin/Android     Color(0xAARRGGBB), Color.parseColor(), 0xAARRGGBB
+
+  Swift/SwiftUI      Color(red:green:blue:), UIColor(), NSColor(),
+                     #colorLiteral()
+
+  Dart/Flutter       Color(0xAARRGGBB), Color.fromARGB(), Color.fromRGBO(),
+                     Colors.name
+
+  C#/Unity           Color(r,g,b,a), Color32(r,g,b,a), new Color()
+
+  Python             (r,g,b), (r,g,b,a), pygame.Color()
+
+  Lua/Love2D         {r,g,b}, {r,g,b,a}
+
+  GLSL/HLSL/Metal    vec3(), vec4(), float3(), float4()
+
+==============================================================================
+10. CUSTOM PATTERNS                         *nvim-colorpicker-custom-patterns*
+
+Define custom color patterns for your own functions and classes.
+
+                                      *nvim-colorpicker-custom-patterns-config*
+Configuration:~
+>lua
+    require("nvim-colorpicker").setup({
+      custom_patterns = {
+        -- Add patterns for specific filetypes
+        cpp = {
+          {
+            pattern = "MyColor%s*%(%s*%d+%s*,%s*%d+%s*,%s*%d+%s*%)",
+            format = "my_color_rgb",
+            priority = 100,  -- Higher = checked first
+            parse = function(match)
+              local r, g, b = match:match(
+                "MyColor%s*%(%s*(%d+)%s*,%s*(%d+)%s*,%s*(%d+)%s*%)")
+              if r and g and b then
+                return string.format("#%02X%02X%02X",
+                  tonumber(r), tonumber(g), tonumber(b))
+              end
+            end,
+            format_color = function(hex, alpha)
+              local r = tonumber(hex:sub(2, 3), 16)
+              local g = tonumber(hex:sub(4, 5), 16)
+              local b = tonumber(hex:sub(6, 7), 16)
+              return string.format("MyColor(%d, %d, %d)", r, g, b)
+            end,
+          },
+        },
+        -- "_all" applies to all filetypes
+        _all = { ... },
+      },
+    })
+<
+
+                                       *nvim-colorpicker-custom-patterns-fields*
+Pattern fields:~
+
+  `pattern`        Lua pattern to match the color string
+  `format`         Unique identifier for this format
+  `priority`       Detection priority (higher = checked first, default: 100)
+  `parse`          Function: (match) -> hex, alpha?
+                   Converts matched string to #RRGGBB and optional alpha 0-100
+  `format_color`   Function: (hex, alpha?) -> string
+                   Converts #RRGGBB and alpha back to color string
+
+==============================================================================
+11. EXTERNAL INTEGRATION                        *nvim-colorpicker-integration*
 
 nvim-colorpicker can be integrated into other plugins using callbacks.
   (see '.\assets\external-usage.gif' for a usage example)
@@ -592,7 +689,7 @@ Programmatic control:~
 <
 
 ==============================================================================
-10. TROUBLESHOOTING                         *nvim-colorpicker-troubleshooting*
+12. TROUBLESHOOTING                         *nvim-colorpicker-troubleshooting*
 
                                    *nvim-colorpicker-troubleshooting-colors*
 Colors not displaying properly:~
