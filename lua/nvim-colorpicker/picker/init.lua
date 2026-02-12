@@ -206,6 +206,9 @@ function ColorPicker.show_multipanel(options)
     grid_win
   )
 
+  -- Store schedule_render on state for embedded container on_change callbacks
+  State.state._schedule_render = schedule_render
+
   Keymaps.setup_multipanel_keymaps(multi, schedule_render, apply, cancel)
   render_multipanel()
 
