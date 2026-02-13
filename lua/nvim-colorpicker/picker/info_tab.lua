@@ -248,14 +248,14 @@ end
 -- ============================================================================
 
 ---Render the complete info panel (tab bar + info content with embedded containers)
----Returns ContentBuilder so multi-panel can create embedded containers
 ---@param multi_state MultiPanelState
----@return ContentBuilder cb
+---@return string[] lines
+---@return table[] highlights
 function M.render_info_panel(multi_state)
   local state = State.state
   if not state then
     local cb = ContentBuilder.new()
-    return cb
+    return cb:build_lines(), cb:build_highlights()
   end
 
   local Tabs = require('nvim-colorpicker.picker.tabs')
@@ -272,7 +272,12 @@ function M.render_info_panel(multi_state)
   -- Store ContentBuilder for element tracking
   M._content_builder = cb
 
-  return cb
+  -- Store on panel for container creation by render_panel
+  if multi_state and multi_state.set_panel_content_builder then
+    multi_state:set_panel_content_builder("info", cb)
+  end
+
+  return cb:build_lines(), cb:build_highlights()
 end
 
 ---Get the stored ContentBuilder (for element tracking integration)
