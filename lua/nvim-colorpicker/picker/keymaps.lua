@@ -450,12 +450,35 @@ function M.setup_info_keymaps(multi, schedule_render)
     end)
   end
 
-  -- Adjust slider based on element at cursor
+  -- Adjust slider based on element at cursor (try VCM first, fallback to element track)
   local function adjust_slider(delta)
     local count = vim.v.count1
     local info_win, cursor_pos = get_cursor_info()
-    local element = get_element()
+    local info_panel = multi.panels and multi.panels.info
 
+    -- Try VCM: find virtual container at cursor row
+    if info_panel and info_panel.float and cursor_pos then
+      local fw = info_panel.float
+      if fw._virtual_manager then
+        local row0 = cursor_pos[1] - 1
+        local line = vim.api.nvim_buf_get_lines(fw.bufnr, row0, row0 + 1, false)[1] or ""
+        local dcol = vim.fn.strdisplaywidth(line:sub(1, cursor_pos[2]))
+        local target = fw._virtual_manager:find_virtual_at(row0, dcol)
+        if target then
+          local slider_index = InfoTab.get_slider_index_from_input_name(target.name)
+          if slider_index then
+            Slider.adjust_component(slider_index, delta * count, function()
+              schedule_render()
+              restore_cursor_after_render(info_win, cursor_pos)
+            end)
+            return
+          end
+        end
+      end
+    end
+
+    -- Fallback: try element track (for non-slider rows)
+    local element = get_element()
     if element then
       InfoTab.adjust_slider_element(element, delta * count, function()
         schedule_render()

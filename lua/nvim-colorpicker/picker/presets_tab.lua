@@ -406,6 +406,11 @@ function M.render_presets_panel(multi_state)
   -- Store ContentBuilder for element tracking
   M._content_builder = cb
 
+  -- Set on panel so render_panel destroys old info tab containers
+  if multi_state and multi_state.set_panel_content_builder then
+    multi_state:set_panel_content_builder("info", cb)
+  end
+
   return cb:build_lines(), cb:build_highlights()
 end
 

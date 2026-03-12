@@ -45,6 +45,7 @@ function M.render_info_content(cb)
     options = mode_options,
     selected = state.color_mode,
     width = 8,
+    tab_stop = false,
     on_change = function(_, v)
       state.color_mode = v
       trigger_render()
@@ -59,6 +60,7 @@ function M.render_info_content(cb)
     label = "  Hex ",
     value = hex_display,
     width = 10,
+    tab_stop = false,
     on_submit = function(_, v)
       local hex = v
       if not hex:match("^#") then hex = "#" .. hex end
@@ -102,28 +104,12 @@ function M.render_info_content(cb)
     local slider_str = Slider.render_slider(value, comp.min, comp.max, 14)
     local formatted = ColorUtils.format_value(value, comp.unit, state.value_format)
 
-    -- Slider bar as text + embedded input for the numeric value
-    cb:spans({
-      {
-        text = "  " .. comp.label .. ": ",
-        style = "label",
-        track = {
-          name = "slider_" .. comp.key,
-          type = "action",
-          row_based = true,
-          hover_style = "emphasis",
-          data = {
-            slider_index = i,
-            component = comp,
-          },
-        },
-      },
-      { text = slider_str, style = "value" },
-    })
+    -- Slider bar + embedded input on one line
     cb:embedded_input("slider_" .. comp.key, {
-      label = "       ",
+      label = "  " .. comp.label .. ": " .. slider_str .. " ",
       value = formatted,
       width = 6,
+      tab_stop = false,
       on_submit = function(_, v)
         local num = tonumber(v:gsub("[°%%]", ""))
         if num then
@@ -157,6 +143,7 @@ function M.render_info_content(cb)
     },
     selected = state.value_format,
     width = 12,
+    tab_stop = false,
     on_change = function(_, v)
       state.value_format = v
       trigger_render()
@@ -191,6 +178,7 @@ function M.render_info_content(cb)
           },
           selected = ctrl_value and "on" or "off",
           width = 6,
+          tab_stop = false,
           on_change = function(_, v)
             state.custom_values[control.id] = (v == "on")
             trigger_render()
@@ -210,6 +198,7 @@ function M.render_info_content(cb)
           options = select_options,
           selected = tostring(ctrl_value),
           width = 15,
+          tab_stop = false,
           on_change = function(_, v)
             state.custom_values[control.id] = v
             trigger_render()
@@ -220,6 +209,7 @@ function M.render_info_content(cb)
           label = "  " .. control.label,
           value = tostring(ctrl_value or 0),
           width = 6,
+          tab_stop = false,
           on_submit = function(_, v)
             local num = tonumber(v)
             if num then
@@ -233,6 +223,7 @@ function M.render_info_content(cb)
           label = "  " .. control.label,
           value = tostring(ctrl_value or ""),
           width = 20,
+          tab_stop = false,
           on_submit = function(_, v)
             state.custom_values[control.id] = v
             trigger_render()
@@ -312,6 +303,21 @@ end
 function M.get_slider_index_from_element(element)
   if element and element.data and element.data.slider_index then
     return element.data.slider_index
+  end
+  return nil
+end
+
+---Get slider index from a virtual container input name (e.g. "slider_h" -> index)
+---@param name string? The virtual container name
+---@return number? slider_index
+function M.get_slider_index_from_input_name(name)
+  if not name or not name:match("^slider_") then return nil end
+  local key = name:sub(8)
+  local state = State.state
+  if not state then return nil end
+  local components = Slider.get_components(state.color_mode, state.alpha_enabled)
+  for i, comp in ipairs(components) do
+    if comp.key == key then return i end
   end
   return nil
 end
