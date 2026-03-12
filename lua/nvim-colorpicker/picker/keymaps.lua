@@ -65,11 +65,29 @@ function M.get_controls_definition()
       }
     },
     {
+      header = "History Tab",
+      keys = {
+        { key = "Enter", desc = "Select color" },
+        { key = "d", desc = "Delete entry" },
+        { key = "c", desc = "Clear all history" },
+      }
+    },
+    {
+      header = "Presets Tab",
+      keys = {
+        { key = "Enter", desc = "Select color / toggle group" },
+        { key = "h / l", desc = "Toggle expand/collapse" },
+        { key = "zo / zc", desc = "Open/close fold" },
+        { key = "zR / zM", desc = "Expand/collapse all" },
+      }
+    },
+    {
       header = "Tabs",
       keys = {
         { key = "g1", desc = "Info tab" },
         { key = "g2", desc = "History tab" },
         { key = "g3", desc = "Presets tab" },
+        { key = "Tab / S-Tab", desc = "Focus next/prev panel" },
       }
     },
     {

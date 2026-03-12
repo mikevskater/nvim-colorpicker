@@ -196,19 +196,6 @@ function M.render_history_content(cb)
     end
   end
 
-  cb:blank()
-  cb:styled("  " .. string.rep("─", 16), "muted")
-  cb:blank()
-
-  if #history > 0 then
-    cb:spans({
-      { text = "  ", style = "normal" },
-      { text = "Enter", style = "key" },
-      { text = "=Select  ", style = "muted" },
-      { text = "d", style = "key" },
-      { text = "=Del", style = "muted" },
-    })
-  end
 end
 
 ---Render the complete history panel (tab bar + history content)

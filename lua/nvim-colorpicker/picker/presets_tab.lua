@@ -370,17 +370,6 @@ function M.render_presets_content(cb)
     end
   end
 
-  cb:blank()
-  cb:styled("  " .. string.rep("─", 16), "muted")
-  cb:blank()
-
-  cb:spans({
-    { text = "  ", style = "normal" },
-    { text = "Enter", style = "key" },
-    { text = "=Sel  ", style = "muted" },
-    { text = "zM/zR", style = "key" },
-    { text = "=Fold", style = "muted" },
-  })
 end
 
 ---Render the complete presets panel (tab bar + presets content)
